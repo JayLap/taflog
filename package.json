@@ -1,0 +1,40 @@
+{
+  "name": "taflog",
+  "version": "0.0.0",
+  "description": "Minimalist CLI time tracker for your job. \"Taf\" is French slang for work.",
+  "type": "module",
+  "bin": {
+    "taflog": "src/cli.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cli",
+    "time",
+    "timer",
+    "tracker",
+    "time-tracking",
+    "timesheet",
+    "work",
+    "taf",
+    "minimalist"
+  ],
+  "license": "MIT",
+  "author": "Jérémie Lapointe",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jelap/taflog.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jelap/taflog/issues"
+  },
+  "homepage": "https://github.com/jelap/taflog#readme"
+}
