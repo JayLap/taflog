@@ -6,25 +6,40 @@ import type { AdjustmentResult } from "../../../application/adjustment.ts"
 import type { RemoveResult } from "../../../application/remove-entry.ts"
 import { formatLocalTime } from "../../../domain/datetime.ts"
 import { formatDuration } from "../../../domain/duration.ts"
+import { createStyle, type Style } from "./style.ts"
 
 /** Terminal presenter for `status` (SPEC §9.1). Always ends with a newline. */
-export function renderStatus(result: StatusResult): string {
+export function renderStatus(result: StatusResult, style: Style = createStyle()): string {
   if (result.timer !== null) {
     const elapsed = elapsedSeconds(result.timer.start, result.now)
-    const header =
+    const project = style.project(result.timer.project)
+    const description =
       result.timer.description === ""
-        ? `● ${result.timer.project}`
-        : `● ${result.timer.project} — ${result.timer.description}`
-    const summary = `  running ${formatDuration(elapsed)} (since ${formatLocalTime(result.timer.start)}) · today ${formatDuration(result.today.totalSeconds)}`
-    return `${header}\n${summary}\n`
+        ? ""
+        : ` — ${style.meta(result.timer.description)}`
+    const header = `${style.running(style.glyphs.running)} ${project}${description}`
+    const summary = style.meta(
+      `  running ${formatDuration(elapsed)} (since ${formatLocalTime(result.timer.start)}) ${style.glyphs.project} today ${formatDuration(result.today.totalSeconds)}`,
+    )
+    return `${style.truncate(header, style.width)}\n${style.truncate(summary, style.width)}\n`
   }
 
   if (result.lastEntry !== null) {
     const duration = elapsedSeconds(result.lastEntry.start, result.lastEntry.end)
-    return `○ idle · last ${result.lastEntry.project} ${formatDuration(duration)} (ended ${formatLocalTime(result.lastEntry.end)}) · today ${formatDuration(result.today.totalSeconds)}\n`
+    return `${style.truncate(
+      style.meta(
+        `${style.glyphs.idle} idle ${style.glyphs.project} last ${style.project(result.lastEntry.project)} ${formatDuration(duration)} (ended ${formatLocalTime(result.lastEntry.end)}) ${style.glyphs.project} today ${formatDuration(result.today.totalSeconds)}`,
+      ),
+      style.width,
+    )}\n`
   }
 
-  return `○ idle · today ${formatDuration(result.today.totalSeconds)}\n`
+  return `${style.truncate(
+    style.meta(
+      `${style.glyphs.idle} idle ${style.glyphs.project} today ${formatDuration(result.today.totalSeconds)}`,
+    ),
+    style.width,
+  )}\n`
 }
 
 /** JSON presenter for `status`; frozen `version: 1`, durations in seconds (SPEC §9.5). */
@@ -43,24 +58,24 @@ export function statusJson(result: StatusResult): string {
 }
 
 /** Confirmation for `start`. */
-export function renderStarted(result: StartResult): string {
-  return `● ${result.timer.project} — running since ${formatLocalTime(result.timer.start)}\n`
+export function renderStarted(result: StartResult, style: Style = createStyle()): string {
+  return `${style.glyphs.running} ${style.project(result.timer.project)} — running since ${formatLocalTime(result.timer.start)}\n`
 }
 
 /** Confirmation for `stop`. */
-export function renderStopped(result: StopResult): string {
+export function renderStopped(result: StopResult, style: Style = createStyle()): string {
   const duration = elapsedSeconds(result.entry.start, result.entry.end)
-  return `○ stopped ${result.entry.project} · ${formatDuration(duration)}\n`
+  return `${style.glyphs.idle} stopped ${style.project(result.entry.project)} ${style.glyphs.project} ${formatDuration(duration)}\n`
 }
 
 /** Confirmation for `switch` (SPEC §10). */
-export function renderSwitched(result: SwitchResult): string {
-  const started = `● ${result.timer.project} — running since ${formatLocalTime(result.timer.start)}`
+export function renderSwitched(result: SwitchResult, style: Style = createStyle()): string {
+  const started = `${style.glyphs.running} ${style.project(result.timer.project)} — running since ${formatLocalTime(result.timer.start)}`
   if (result.closed === null) {
     return `${started}\n`
   }
   const duration = elapsedSeconds(result.closed.start, result.closed.end)
-  return `○ ${result.closed.project} ${formatDuration(duration)} → ${started}\n`
+  return `${style.glyphs.idle} ${style.project(result.closed.project)} ${formatDuration(duration)} → ${started}\n`
 }
 
 function elapsedSeconds(start: Date, end: Date): number {
@@ -68,24 +83,19 @@ function elapsedSeconds(start: Date, end: Date): number {
 }
 
 /** Confirmation for `add`/`sub` (SPEC §8.1): a signed Adjustment line. */
-export function renderAdjusted(result: AdjustmentResult): string {
+export function renderAdjusted(result: AdjustmentResult, style: Style = createStyle()): string {
   const adjustment = result.adjustment
   const note = adjustment.note === undefined ? "" : ` — ${adjustment.note}`
-  return `${formatSignedDuration(adjustment.delta)} ${adjustment.project} · ${adjustment.date}${note}\n`
+  return `${style.signed(adjustment.delta)} ${style.project(adjustment.project)} ${style.glyphs.project} ${adjustment.date}${note}\n`
 }
 
 /** Confirmation for `rm` (SPEC §8.1): the tombstoned Entry or Adjustment. */
-export function renderRemoved(result: RemoveResult): string {
+export function renderRemoved(result: RemoveResult, style: Style = createStyle()): string {
   if (result.removed.kind === "entry") {
     const removed = result.removed.entry
     const duration = elapsedSeconds(removed.start, removed.end)
-    return `○ removed ${removed.project} ${formatDuration(duration)}\n`
+    return `${style.glyphs.idle} removed ${style.project(removed.project)} ${formatDuration(duration)}\n`
   }
   const removed = result.removed.adjustment
-  return `○ removed adjustment ${formatSignedDuration(removed.delta)} ${removed.project}\n`
-}
-
-function formatSignedDuration(delta: number): string {
-  const sign = delta < 0 ? "−" : "+"
-  return `${sign}${formatDuration(Math.abs(delta))}`
+  return `${style.glyphs.idle} removed adjustment ${style.signed(removed.delta)} ${style.project(removed.project)}\n`
 }

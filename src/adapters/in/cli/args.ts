@@ -1,6 +1,7 @@
 import { UsageError } from "../../../application/errors.ts"
 
 export type IconsProfile = "auto" | "nerd" | "ascii"
+export type ReportBy = "project" | "day"
 
 export interface GlobalOptions {
   dir: string | null
@@ -11,6 +12,18 @@ export interface GlobalOptions {
   force: boolean
   date: string | null
   note: string | null
+  today: boolean
+  week: boolean
+  month: boolean
+  project: string | null
+  from: string | null
+  to: string | null
+  limit: number | null
+  ids: boolean
+  by: ReportBy | null
+  details: boolean
+  pretty: boolean
+  seconds: boolean
   help: boolean
   version: boolean
 }
@@ -37,6 +50,18 @@ export function parseArgs(argv: string[]): ParsedArgs {
     force: false,
     date: null,
     note: null,
+    today: false,
+    week: false,
+    month: false,
+    project: null,
+    from: null,
+    to: null,
+    limit: null,
+    ids: false,
+    by: null,
+    details: false,
+    pretty: false,
+    seconds: false,
     help: false,
     version: false,
   }
@@ -69,6 +94,79 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
     if (arg === "--force") {
       options.force = true
+      continue
+    }
+    if (arg === "--today") {
+      options.today = true
+      continue
+    }
+    if (arg === "--week") {
+      options.week = true
+      continue
+    }
+    if (arg === "--month") {
+      options.month = true
+      continue
+    }
+    if (arg === "--ids") {
+      options.ids = true
+      continue
+    }
+    if (arg === "--details") {
+      options.details = true
+      continue
+    }
+    if (arg === "--pretty") {
+      options.pretty = true
+      continue
+    }
+    if (arg === "--seconds") {
+      options.seconds = true
+      continue
+    }
+    if (arg === "--project") {
+      options.project = requireValue(argv, index, "--project")
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--project=")) {
+      options.project = arg.slice("--project=".length)
+      continue
+    }
+    if (arg === "--from") {
+      options.from = requireValue(argv, index, "--from")
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--from=")) {
+      options.from = arg.slice("--from=".length)
+      continue
+    }
+    if (arg === "--to") {
+      options.to = requireValue(argv, index, "--to")
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--to=")) {
+      options.to = arg.slice("--to=".length)
+      continue
+    }
+    if (arg === "--limit") {
+      options.limit = parseLimit(requireValue(argv, index, "--limit"))
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--limit=")) {
+      options.limit = parseLimit(arg.slice("--limit=".length))
+      continue
+    }
+    if (arg === "--by") {
+      options.by = parseBy(requireValue(argv, index, "--by"))
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--by=")) {
+      options.by = parseBy(arg.slice("--by=".length))
       continue
     }
     if (arg === "--dir") {
@@ -129,4 +227,16 @@ function requireValue(argv: string[], index: number, flag: string): string {
 function parseIcons(value: string): IconsProfile {
   if (value === "auto" || value === "nerd" || value === "ascii") return value
   throw new UsageError(`invalid --icons value: ${value}`)
+}
+
+function parseLimit(value: string): number {
+  if (!/^\d+$/.test(value) || Number(value) <= 0) {
+    throw new UsageError(`invalid --limit value: ${value}`)
+  }
+  return Number(value)
+}
+
+function parseBy(value: string): ReportBy {
+  if (value === "project" || value === "day") return value
+  throw new UsageError(`invalid --by value: ${value}`)
 }

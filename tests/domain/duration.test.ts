@@ -40,3 +40,8 @@ test("parseDuration returns null for malformed input", () => {
     assert.equal(parseDuration(input), null, `parseDuration(${JSON.stringify(input)})`)
   }
 })
+
+test("formatDuration keeps a negative total negative instead of clamping", () => {
+  assert.equal(formatDuration(-1800), "−30m")
+  assert.equal(formatDuration(-3660), "−1h01m")
+})

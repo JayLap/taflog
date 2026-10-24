@@ -13,4 +13,6 @@ export interface ReadResult {
 export interface EventLog {
   append(event: Event): Promise<void>
   readAll(): Promise<ReadResult>
+  /** Raw bytes of the Log, never parsed; used by `export` (SPEC §9.6). */
+  readRaw(): Promise<string>
 }

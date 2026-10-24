@@ -34,7 +34,7 @@ Hexagonal, hand-wired composition root. See ADR-0005.
 src/
   domain/        pure: Event/Entry types, deriveEntries, deriveTimer,
                  aggregations, duration and date formatting
-  ports/         Clock { now() }, EventLog { append, readAll }
+  ports/         Clock { now() }, EventLog { append, readAll, readRaw }
   application/   one use case per command: StartTask, StopTask, SwitchTask,
                  ShowStatus, AddAdjustment, SubAdjustment, RemoveEntry,
                  QueryLog, BuildReport
@@ -222,7 +222,8 @@ $ taflog status
 
 ### 9.2 `log`
 
-Default today, newest first. Adjustments carry no time range.
+Default today, in chronological order; Adjustments follow the timed rows.
+Adjustments carry no time range.
 
 ```console
 $ taflog log

@@ -8,6 +8,9 @@ import { JsonlEventLog } from "./adapters/out/store/jsonl-event-log.ts"
 import { defaultDataDir } from "./adapters/out/store/paths.ts"
 import { UsageError } from "./application/errors.ts"
 import { AddAdjustment, SubAdjustment } from "./application/adjustment.ts"
+import { BuildReport } from "./application/build-report.ts"
+import { ExportLog } from "./application/export-log.ts"
+import { QueryLog } from "./application/query-log.ts"
 import { RemoveEntry } from "./application/remove-entry.ts"
 import { StartTask } from "./application/start-task.ts"
 import { ShowStatus } from "./application/status.ts"
@@ -42,9 +45,15 @@ async function main(): Promise<void> {
     addAdjustment: new AddAdjustment(clock, log),
     subAdjustment: new SubAdjustment(clock, log),
     removeEntry: new RemoveEntry(clock, log),
+    queryLog: new QueryLog(clock, log),
+    buildReport: new BuildReport(clock, log),
+    exportLog: new ExportLog(log),
     version: version(),
     stdout: (chunk) => process.stdout.write(chunk),
     stderr: (chunk) => process.stderr.write(chunk),
+    env: process.env,
+    isTTY: process.stdout.isTTY === true,
+    columns: process.stdout.columns,
   })
   process.exit(code)
 }

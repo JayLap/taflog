@@ -1,4 +1,7 @@
 import type { AddAdjustment, SubAdjustment } from "../../../application/adjustment.ts"
+import type { BuildReport } from "../../../application/build-report.ts"
+import type { ExportLog } from "../../../application/export-log.ts"
+import type { QueryLog } from "../../../application/query-log.ts"
 import type { RemoveEntry } from "../../../application/remove-entry.ts"
 import type { StartTask } from "../../../application/start-task.ts"
 import type { ShowStatus } from "../../../application/status.ts"
@@ -16,6 +19,9 @@ import {
   renderSwitched,
   statusJson,
 } from "./present.ts"
+import { logJson, renderLog } from "./present-log.ts"
+import { renderReport, reportJson } from "./present-report.ts"
+import { createStyle, resolveColor, resolveIcons } from "./style.ts"
 
 /** Everything the CLI needs, injected by the composition root (ADR-0005). */
 export interface CliDeps {
@@ -26,9 +32,16 @@ export interface CliDeps {
   addAdjustment: AddAdjustment
   subAdjustment: SubAdjustment
   removeEntry: RemoveEntry
+  queryLog: QueryLog
+  buildReport: BuildReport
+  exportLog: ExportLog
   version: string
   stdout: (chunk: string) => void
   stderr: (chunk: string) => void
+  /** Presentation environment; defaults keep tests terminal-free. */
+  env?: NodeJS.ProcessEnv
+  isTTY?: boolean
+  columns?: number
 }
 
 export const USAGE = `taflog — minimalist CLI time tracker
@@ -47,9 +60,20 @@ Usage:
   taflog set <key> <value>
   taflog export
 
+Filters:
+  --today, --week, --month    preset window (log defaults to today; report to this week)
+  --project <p>               case-insensitive Project filter
+  --from <date> --to <date>   explicit window
+  --limit <n>                 newest entries (log)
+  --by <project|day>          report grouping
+  --details                   add Description sub-rows to the report grid
+  --ids                       show Entry/Adjustment identities (log)
+  --seconds                   show seconds alongside rendered durations
+
 Global flags:
   --dir <path>              data directory
   --json                    machine-readable output
+  --pretty                  indent --json output
   --no-color                disable colour
   --icons <auto|nerd|ascii> glyph profile
   --strict                  fail on unreadable log lines
@@ -74,13 +98,20 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
     return 0
   }
 
+  const env = deps.env ?? process.env
+  const style = createStyle({
+    icons: resolveIcons(parsed.options.icons, env),
+    color: resolveColor(parsed.options.noColor, env, deps.isTTY === true),
+    width: deps.columns ?? Number.POSITIVE_INFINITY,
+  })
+
   const command = parsed.command ?? "status"
   try {
     switch (command) {
       case "status": {
         const result = await deps.showStatus.execute()
         warnSkipped(result.skipped, deps)
-        deps.stdout(parsed.options.json ? statusJson(result) : renderStatus(result))
+        deps.stdout(parsed.options.json ? statusJson(result) : renderStatus(result, style))
         return 0
       }
       case "start": {
@@ -92,7 +123,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
           ...(description === undefined ? {} : { description }),
         })
         warnSkipped(result.skipped, deps)
-        deps.stdout(renderStarted(result))
+        deps.stdout(renderStarted(result, style))
         return 0
       }
       case "stop": {
@@ -102,7 +133,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
           ...(parsed.options.force ? { force: true } : {}),
         })
         warnSkipped(result.skipped, deps)
-        deps.stdout(renderStopped(result))
+        deps.stdout(renderStopped(result, style))
         return 0
       }
       case "switch": {
@@ -115,7 +146,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
           ...(parsed.options.force ? { force: true } : {}),
         })
         warnSkipped(result.skipped, deps)
-        deps.stdout(renderSwitched(result))
+        deps.stdout(renderSwitched(result, style))
         return 0
       }
       case "add":
@@ -132,7 +163,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
           ...(parsed.options.note === null ? {} : { note: parsed.options.note }),
         })
         warnSkipped(result.skipped, deps)
-        deps.stdout(renderAdjusted(result))
+        deps.stdout(renderAdjusted(result, style))
         return 0
       }
       case "rm": {
@@ -140,7 +171,39 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         const id = parsed.operands[0]
         const result = await deps.removeEntry.execute(id === undefined ? {} : { id })
         warnSkipped(result.skipped, deps)
-        deps.stdout(renderRemoved(result))
+        deps.stdout(renderRemoved(result, style))
+        return 0
+      }
+      case "log": {
+        const result = await deps.queryLog.execute(rangeInput(parsed))
+        warnSkipped(result.skipped, deps)
+        deps.stdout(
+          parsed.options.json
+            ? logJson(result, { pretty: parsed.options.pretty })
+            : renderLog(result, {
+                style,
+                ids: parsed.options.ids,
+                seconds: parsed.options.seconds,
+              }),
+        )
+        return 0
+      }
+      case "report": {
+        const result = await deps.buildReport.execute(rangeInput(parsed))
+        warnSkipped(result.skipped, deps)
+        deps.stdout(
+          parsed.options.json
+            ? reportJson(result, { pretty: parsed.options.pretty })
+            : renderReport(result, {
+                style,
+                grid: parsed.options.by === "day" || parsed.options.details,
+                details: parsed.options.details,
+              }),
+        )
+        return 0
+      }
+      case "export": {
+        deps.stdout(await deps.exportLog.execute())
         return 0
       }
       default:
@@ -152,6 +215,26 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
       return error.exitCode
     }
     throw error
+  }
+}
+
+function rangeInput(parsed: ParsedArgs): {
+  today?: boolean
+  week?: boolean
+  month?: boolean
+  project?: string
+  from?: string
+  to?: string
+  limit?: number
+} {
+  return {
+    ...(parsed.options.today ? { today: true } : {}),
+    ...(parsed.options.week ? { week: true } : {}),
+    ...(parsed.options.month ? { month: true } : {}),
+    ...(parsed.options.project === null ? {} : { project: parsed.options.project }),
+    ...(parsed.options.from === null ? {} : { from: parsed.options.from }),
+    ...(parsed.options.to === null ? {} : { to: parsed.options.to }),
+    ...(parsed.options.limit === null ? {} : { limit: parsed.options.limit }),
   }
 }
 

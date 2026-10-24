@@ -39,6 +39,91 @@ function pad(value: number): string {
   return String(value).padStart(2, "0")
 }
 
+/** Local midnight on the first day of `date`'s week (SPEC §6, §7). */
+export function startOfLocalWeek(date: Date, weekStart: WeekStart = "monday"): Date {
+  const day = startOfLocalDay(date)
+  const offset = weekStart === "monday" ? (day.getDay() + 6) % 7 : day.getDay()
+  day.setDate(day.getDate() - offset)
+  return day
+}
+
+/** Local midnight seven calendar days after the start of `date`'s week. */
+export function startOfNextLocalWeek(date: Date, weekStart: WeekStart = "monday"): Date {
+  const day = startOfLocalWeek(date, weekStart)
+  day.setDate(day.getDate() + 7)
+  return day
+}
+
+/** Local midnight on the first day of `date`'s month. */
+export function startOfLocalMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+/** Local midnight on the first day of the month after `date`. */
+export function startOfNextLocalMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 1)
+}
+
+/** A new local date shifted by `days` calendar days. */
+export function addLocalDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
+}
+
+/** Every local midnight in `[from, to)`. */
+export function enumerateLocalDays(from: Date, to: Date): Date[] {
+  const days: Date[] = []
+  let cursor = startOfLocalDay(from)
+  const limit = to.getTime()
+  while (cursor.getTime() < limit) {
+    days.push(cursor)
+    cursor = addLocalDays(cursor, 1)
+  }
+  return days
+}
+
+/** True for local Saturday or Sunday. */
+export function isWeekend(date: Date): boolean {
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
+
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const
+
+export function formatShortWeekday(date: Date): string {
+  return WEEKDAY_NAMES[date.getDay()] ?? ""
+}
+
+export function formatShortMonth(date: Date): string {
+  return MONTH_NAMES[date.getMonth()] ?? ""
+}
+
+/** ISO-8601 week number (weeks start Monday; week 1 contains the first Thursday). */
+export function isoWeekNumber(date: Date): number {
+  const thursday = startOfLocalDay(date)
+  const weekday = (thursday.getDay() + 6) % 7
+  thursday.setDate(thursday.getDate() - weekday + 3)
+
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4)
+  const firstWeekday = (firstThursday.getDay() + 6) % 7
+  firstThursday.setDate(firstThursday.getDate() - firstWeekday + 3)
+
+  return 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 86_400_000))
+}
+
 const WEEKDAY_INDEX: Record<string, number> = {
   sun: 0,
   mon: 1,

@@ -40,4 +40,8 @@ export class InMemoryEventLog implements EventLog {
   async readAll(): Promise<ReadResult> {
     return { events: [...this.events], skipped: this.skipped }
   }
+
+  async readRaw(): Promise<string> {
+    return this.events.map((event) => JSON.stringify(event)).join("\n") + (this.events.length > 0 ? "\n" : "")
+  }
 }

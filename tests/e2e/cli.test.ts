@@ -290,3 +290,138 @@ test("rm with an unknown id is a runtime error", () => {
     assert.match(removed.stderr, /no entry or adjustment matches/)
   })
 })
+
+function seedWeek(dir: string): void {
+  const at = (day: number, hour: number, minute = 0): string =>
+    new Date(2025, 9, day, hour, minute).toISOString()
+  const events = [
+    { v: 1, id: "a0000001", t: "start", at: at(20, 9), project: "acme", description: "new parser" },
+    { v: 1, id: "a0000002", t: "stop", at: at(20, 10), entry: "a0000001" },
+    { v: 1, id: "b0000001", t: "start", at: at(20, 9), project: "beta", description: "emails" },
+    { v: 1, id: "b0000002", t: "stop", at: at(20, 9, 30), entry: "b0000001" },
+    { v: 1, id: "a0000003", t: "start", at: at(21, 9), project: "acme", description: "new parser" },
+    { v: 1, id: "a0000004", t: "stop", at: at(21, 10, 30), entry: "a0000003" },
+    {
+      v: 1,
+      id: "c0000001",
+      t: "adjust",
+      at: at(21, 12),
+      date: "2025-10-21",
+      project: "acme",
+      delta: -1800,
+      note: "forgot to start",
+    },
+  ]
+  appendFileSync(
+    join(dir, "events.ndjson"),
+    `${events.map((event) => JSON.stringify(event)).join("\n")}\n`,
+  )
+}
+
+const weekArgs = ["--from", "2025-10-20", "--to", "2025-10-26"]
+
+test("log lists Entries and Adjustments and reconciles totals", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const result = run(dir, ["log", ...weekArgs])
+    assert.equal(result.status, 0)
+    assert.match(result.stdout, /new parser/)
+    assert.match(result.stdout, /adjustment · forgot to start/)
+    assert.match(result.stdout, /2h30m/) // 1h + 1h30m timed + 0.5h adjustment = 3h
+    assert.equal(result.stderr, "")
+  })
+})
+
+test("log --json is the frozen version-1 shape", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const parsed = JSON.parse(run(dir, ["log", ...weekArgs, "--json"]).stdout)
+    assert.equal(parsed.version, 1)
+    assert.deepEqual(parsed.query, { from: "2025-10-20", to: "2025-10-26", project: null })
+    assert.equal(parsed.entries.length, 4)
+    assert.equal(parsed.entries[0].kind, "timed")
+    assert.equal(parsed.entries[0].durationSeconds, 3600)
+    assert.equal(parsed.entries[3].kind, "adjust")
+    assert.equal(parsed.entries[3].note, "forgot to start")
+    assert.equal(parsed.totals.timedSeconds, 10800)
+    assert.equal(parsed.totals.adjustedSeconds, -1800)
+    assert.equal(parsed.totals.totalSeconds, 9000)
+  })
+})
+
+test("log --project filters case-insensitively", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const parsed = JSON.parse(run(dir, ["log", ...weekArgs, "--project", "ACME", "--json"]).stdout)
+    assert.equal(parsed.query.project, "ACME")
+    assert.equal(parsed.entries.every((entry: { project: string }) => entry.project === "acme"), true)
+  })
+})
+
+test("log --limit keeps the most recent rows", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const parsed = JSON.parse(run(dir, ["log", ...weekArgs, "--limit", "1", "--json"]).stdout)
+    assert.equal(parsed.entries.length, 1)
+    assert.equal(parsed.entries[0].kind, "adjust")
+  })
+})
+
+test("report --json always contains byProject and byDay", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const parsed = JSON.parse(run(dir, ["report", ...weekArgs, "--json"]).stdout)
+    assert.equal(parsed.version, 1)
+    assert.deepEqual(parsed.range, { from: "2025-10-20", to: "2025-10-26", weekStart: "monday" })
+    assert.deepEqual(parsed.byProject.map((project: { project: string }) => project.project), [
+      "acme",
+      "beta",
+    ])
+    assert.equal(parsed.byProject[0].timedSeconds, 9000)
+    assert.equal(parsed.byProject[0].adjustedSeconds, -1800)
+    assert.equal(parsed.byProject[0].totalSeconds, 7200)
+    assert.equal(parsed.byDay.length, 7)
+  })
+})
+
+test("report --by day and --details render grids", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const grid = run(dir, ["report", ...weekArgs, "--by", "day"])
+    assert.equal(grid.status, 0)
+    assert.match(grid.stdout, /Total/)
+    assert.match(grid.stdout, /2h00/)
+    assert.match(grid.stdout, /0h30/)
+
+    const details = run(dir, ["report", ...weekArgs, "--details"])
+    assert.equal(details.status, 0)
+    assert.match(details.stdout, /new parser/)
+    assert.match(details.stdout, /adjustments/)
+  })
+})
+
+test("export is the exact raw Log and round-trips through a JSONL parser", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const raw = readFileSync(join(dir, "events.ndjson"), "utf8")
+    const exported = run(dir, ["export"])
+    assert.equal(exported.status, 0)
+    assert.equal(exported.stdout, raw)
+
+    const parsed = exported.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { v: number; t: string })
+    assert.equal(parsed.length, 7)
+    assert.equal(parsed.every((event) => event.v === 1), true)
+  })
+})
+
+test("invalid read filters are usage errors", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["log", "--limit", "0"]).status, 2)
+    assert.equal(run(dir, ["report", "--by", "week"]).status, 2)
+    assert.equal(run(dir, ["log", "--today", "--week"]).status, 2)
+    assert.equal(run(dir, ["report", "--from", "nope"]).status, 2)
+  })
+})

@@ -30,15 +30,17 @@ export class JsonlEventLog implements EventLog {
     await appendFile(this.file, `${JSON.stringify(event)}\n`, { mode: 0o600 })
   }
 
-  async readAll(): Promise<ReadResult> {
-    let content: string
+  async readRaw(): Promise<string> {
     try {
-      content = await readFile(this.file, "utf8")
+      return await readFile(this.file, "utf8")
     } catch (error) {
-      if (isNotFound(error)) return { events: [], skipped: 0 }
+      if (isNotFound(error)) return ""
       throw error
     }
+  }
 
+  async readAll(): Promise<ReadResult> {
+    const content = await this.readRaw()
     const events: Event[] = []
     let skipped = 0
     for (const line of content.split("\n")) {

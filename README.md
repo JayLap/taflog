@@ -12,18 +12,22 @@ correct the record when you forget, and read back where the hours went.
 
 ## Status
 
-🚧 **Phase 3 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
+🚧 **Phase 4 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
 `switch` manage the running Timer; `status` reports it. `add`, `sub`, and `rm`
-correct the record with dated, signed Adjustments and append-only tombstones,
-with duration parsing (`90m`, `1h30m`, `1.5h`, bare minutes) and date parsing
-(`YYYY-MM-DD`, `today`, `yesterday`, weekday names). Persistence is append-only
-NDJSON with `--dir`, `--json`, corrupt-line warnings, and `--strict`. `start`
-while running and `stop` while idle are refused, and a forgotten Timer
-(`maxTimerHours`, default 8) needs `--force` to close. The design is settled in
-[`SPEC.md`](./SPEC.md), decisions are recorded in
+correct the record with dated, signed Adjustments and append-only tombstones.
+`log` and `report` read it back: `log` lists Entries and Adjustments, and
+`report` summarizes by Project or by day (`--by day`, `--details`), with
+`--today`, `--week`, `--month`, `--project`, and `--from`/`--to` filters.
+`--json` has a frozen `version: 1` shape, `--ids` shows identities, and `export`
+dumps the raw Log byte-for-byte. Durations parse `90m`, `1h30m`, `1.5h`, and
+bare minutes; dates accept `YYYY-MM-DD`, `today`, `yesterday`, and weekday
+names. Persistence is append-only NDJSON with `--dir`, corrupt-line warnings,
+and `--strict`. `start` while running and `stop` while idle are refused, and a
+forgotten Timer (`maxTimerHours`, default 8) needs `--force` to close. Colour
+and glyphs follow `NO_COLOR`, `--icons`, and the terminal. The design is
+settled in [`SPEC.md`](./SPEC.md), decisions are recorded in
 [`docs/adr/`](./docs/adr), and vocabulary follows
-[`GLOSSARY.md`](./GLOSSARY.md). Later phases add the read commands and
-configuration.
+[`GLOSSARY.md`](./GLOSSARY.md). The next phase adds configuration.
 
 ## Install
 
