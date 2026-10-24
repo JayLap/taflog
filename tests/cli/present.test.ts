@@ -1,8 +1,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { renderStatus, statusJson } from "../../src/adapters/in/cli/present.ts"
-import { renderSwitched } from "../../src/adapters/in/cli/present.ts"
+import { renderAdjusted, renderRemoved, renderSwitched } from "../../src/adapters/in/cli/present.ts"
 import type { StatusResult } from "../../src/application/status.ts"
+import type { AdjustmentResult } from "../../src/application/adjustment.ts"
+import type { RemoveResult } from "../../src/application/remove-entry.ts"
 import type { SwitchResult } from "../../src/application/switch-task.ts"
 import type { Entry, Timer } from "../../src/domain/entry.ts"
 
@@ -104,4 +106,61 @@ test("renderSwitched while idle renders like start", () => {
     timer: timer("beta", "emails", new Date(2025, 9, 23, 9, 36)),
   }
   assert.equal(renderSwitched(result), "● beta — running since 09:36\n")
+})
+
+test("renderAdjusted shows the signed duration, project, date, and note", () => {
+  const added: AdjustmentResult = {
+    skipped: 0,
+    event: {
+      v: 1,
+      id: "aaaaaaa1",
+      t: "adjust",
+      at: "2025-10-23T13:05:00.000Z",
+      date: "2025-10-23",
+      project: "acme",
+      delta: 3000,
+      note: "forgot to start",
+    },
+    adjustment: {
+      id: "aaaaaaa1",
+      project: "acme",
+      date: "2025-10-23",
+      delta: 3000,
+      note: "forgot to start",
+    },
+  }
+  assert.equal(renderAdjusted(added), "+50m acme · 2025-10-23 — forgot to start\n")
+
+  const subtracted: AdjustmentResult = {
+    ...added,
+    adjustment: { id: "bbbbbbb2", project: "beta", date: "2025-10-22", delta: -1800 },
+  }
+  assert.equal(renderAdjusted(subtracted), "−30m beta · 2025-10-22\n")
+})
+
+test("renderRemoved names the removed Entry or Adjustment", () => {
+  const removedEntry: RemoveResult = {
+    skipped: 0,
+    event: {
+      v: 1,
+      id: "ffffffff",
+      t: "delete",
+      at: "2025-10-23T13:05:00.000Z",
+      entry: "aaaaaaa1",
+    },
+    removed: {
+      kind: "entry",
+      entry: entry("acme", "", new Date(2025, 9, 23, 9, 12), new Date(2025, 9, 23, 9, 36)),
+    },
+  }
+  assert.equal(renderRemoved(removedEntry), "○ removed acme 24m\n")
+
+  const removedAdjustment: RemoveResult = {
+    ...removedEntry,
+    removed: {
+      kind: "adjustment",
+      adjustment: { id: "bbbbbbb2", project: "beta", date: "2025-10-23", delta: -1800 },
+    },
+  }
+  assert.equal(renderRemoved(removedAdjustment), "○ removed adjustment −30m beta\n")
 })

@@ -14,7 +14,8 @@ import {
 /**
  * SPEC §10, one test per row of the running-Timer state table. The correction
  * rows (`add`/`sub` while running, negative days, `rm` on the open Timer) live
- * with the corrections landed in Phase 3.
+ * with the corrections: `tests/application/adjustment.test.ts`,
+ * `tests/application/remove-entry.test.ts`, and `tests/domain/summary.test.ts`.
  */
 
 test("start while idle opens a Timer", async () => {

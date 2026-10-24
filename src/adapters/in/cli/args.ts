@@ -9,6 +9,8 @@ export interface GlobalOptions {
   icons: IconsProfile | null
   strict: boolean
   force: boolean
+  date: string | null
+  note: string | null
   help: boolean
   version: boolean
 }
@@ -33,6 +35,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     icons: null,
     strict: false,
     force: false,
+    date: null,
+    note: null,
     help: false,
     version: false,
   }
@@ -74,6 +78,24 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
     if (arg.startsWith("--dir=")) {
       options.dir = arg.slice("--dir=".length)
+      continue
+    }
+    if (arg === "--date") {
+      options.date = requireValue(argv, index, "--date")
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--date=")) {
+      options.date = arg.slice("--date=".length)
+      continue
+    }
+    if (arg === "--note") {
+      options.note = requireValue(argv, index, "--note")
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--note=")) {
+      options.note = arg.slice("--note=".length)
       continue
     }
     if (arg === "--icons") {

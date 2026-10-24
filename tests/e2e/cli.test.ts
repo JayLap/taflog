@@ -181,3 +181,112 @@ test("an unknown command is a usage error", () => {
     assert.equal(run(dir, ["frobnicate"]).status, 2)
   })
 })
+
+function readEvents(dir: string): Array<Record<string, unknown>> {
+  return readFileSync(join(dir, "events.ndjson"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+}
+
+test("add writes a positive Adjustment counted toward today", () => {
+  withTempDir((dir) => {
+    const added = run(dir, ["add", "acme", "90m", "--note", "forgot to start"])
+    assert.equal(added.status, 0)
+    assert.match(added.stdout, /\+1h30m acme/)
+
+    const events = readEvents(dir)
+    assert.equal(events.length, 1)
+    assert.equal(events[0]?.t, "adjust")
+    assert.equal(events[0]?.delta, 5400)
+    assert.equal(events[0]?.note, "forgot to start")
+
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.today.adjustedSeconds, 5400)
+    assert.equal(status.today.totalSeconds, 5400)
+  })
+})
+
+test("sub writes a negative Adjustment for the same duration", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["sub", "beta", "30m"]).status, 0)
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.today.adjustedSeconds, -1800)
+    assert.equal(status.today.totalSeconds, -1800)
+  })
+})
+
+test("add records an explicit --date", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["start", "acme", "writing tests"]).status, 0)
+    assert.equal(run(dir, ["stop"]).status, 0)
+    const added = run(dir, ["add", "acme", "15m", "--date", "yesterday"])
+    assert.equal(added.status, 0)
+
+    const events = readEvents(dir)
+    const adjust = events.find((event) => event.t === "adjust")
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const expected = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`
+    assert.equal(adjust?.date, expected)
+  })
+})
+
+test("a bad duration or date is a usage error", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["add", "acme", "nope"]).status, 2)
+    assert.equal(run(dir, ["add", "acme", "30m", "--date", "nope"]).status, 2)
+    assert.equal(existsSync(join(dir, "events.ndjson")), false)
+  })
+})
+
+test("rm by id tombstones an Adjustment", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["add", "acme", "90m"]).status, 0)
+    const id = readEvents(dir)[0]?.id as string
+    const removed = run(dir, ["rm", id])
+    assert.equal(removed.status, 0)
+    assert.match(removed.stdout, /removed adjustment/)
+
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.today.adjustedSeconds, 0)
+  })
+})
+
+test("rm resolves an unambiguous prefix", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["add", "acme", "90m"]).status, 0)
+    const id = readEvents(dir)[0]?.id as string
+    assert.equal(run(dir, ["rm", id.slice(0, 4)]).status, 0)
+    assert.equal(JSON.parse(run(dir, ["status", "--json"]).stdout).today.adjustedSeconds, 0)
+  })
+})
+
+test("bare rm removes the most recent Entry or Adjustment", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["add", "acme", "90m"]).status, 0)
+    assert.equal(run(dir, ["add", "beta", "30m"]).status, 0)
+    assert.equal(run(dir, ["rm"]).status, 0)
+
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.today.adjustedSeconds, 5400)
+  })
+})
+
+test("rm refuses to remove the running Timer", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["start", "acme"]).status, 0)
+    const id = readEvents(dir)[0]?.id as string
+    const removed = run(dir, ["rm", id])
+    assert.equal(removed.status, 1)
+    assert.match(removed.stderr, /that entry is running/)
+  })
+})
+
+test("rm with an unknown id is a runtime error", () => {
+  withTempDir((dir) => {
+    const removed = run(dir, ["rm", "zzzzzzzz"])
+    assert.equal(removed.status, 1)
+    assert.match(removed.stderr, /no entry or adjustment matches/)
+  })
+})

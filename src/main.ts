@@ -7,6 +7,8 @@ import { SystemClock } from "./adapters/out/clock/system-clock.ts"
 import { JsonlEventLog } from "./adapters/out/store/jsonl-event-log.ts"
 import { defaultDataDir } from "./adapters/out/store/paths.ts"
 import { UsageError } from "./application/errors.ts"
+import { AddAdjustment, SubAdjustment } from "./application/adjustment.ts"
+import { RemoveEntry } from "./application/remove-entry.ts"
 import { StartTask } from "./application/start-task.ts"
 import { ShowStatus } from "./application/status.ts"
 import { StopTask } from "./application/stop-task.ts"
@@ -37,6 +39,9 @@ async function main(): Promise<void> {
     stopTask: new StopTask(clock, log),
     switchTask: new SwitchTask(clock, log),
     showStatus: new ShowStatus(clock, log),
+    addAdjustment: new AddAdjustment(clock, log),
+    subAdjustment: new SubAdjustment(clock, log),
+    removeEntry: new RemoveEntry(clock, log),
     version: version(),
     stdout: (chunk) => process.stdout.write(chunk),
     stderr: (chunk) => process.stderr.write(chunk),

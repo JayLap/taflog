@@ -29,3 +29,22 @@ export function encodeId(bytes: Uint8Array): string {
 export function newId(): string {
   return encodeId(randomBytes(5))
 }
+
+/** Outcome of resolving an id prefix against the known ids (SPEC §4.4). */
+export type PrefixResolution =
+  | { status: "unique"; id: string }
+  | { status: "none" }
+  | { status: "ambiguous"; matches: string[] }
+
+/**
+ * Resolve a full id or unambiguous prefix (SPEC §4.4). Matching is
+ * case-insensitive, since ids are lowercase Crockford base32.
+ */
+export function resolvePrefix(prefix: string, ids: readonly string[]): PrefixResolution {
+  const key = prefix.trim().toLowerCase()
+  if (key === "") return { status: "none" }
+  const matches = [...new Set(ids.filter((id) => id.toLowerCase().startsWith(key)))]
+  if (matches.length === 0) return { status: "none" }
+  if (matches.length === 1) return { status: "unique", id: matches[0]! }
+  return { status: "ambiguous", matches }
+}

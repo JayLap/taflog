@@ -4,6 +4,7 @@ import type { Event } from "../../src/domain/events.ts"
 import {
   deriveAdjustments,
   deriveEntries,
+  deriveRemovable,
   deriveTimer,
   reduceEvents,
 } from "../../src/domain/reduce.ts"
@@ -156,4 +157,30 @@ test("an Adjustment is independent of a running Timer", () => {
   const state = reduceEvents(events)
   assert.equal(state.timer?.id, "aaaaaaa1")
   assert.deepEqual(state.adjustments.map((adjustment) => adjustment.project), ["beta"])
+})
+
+test("deriveRemovable lists live Entries and Adjustments in log order", () => {
+  const events = [
+    start("aaaaaaa1", "acme", "09:12"),
+    adjust("bbbbbbb2", "beta", "2025-10-23", 3000),
+    stop("ccccccc3", "aaaaaaa1", "10:00"),
+    start("ddddddd4", "gamma", "10:05"),
+  ]
+  assert.deepEqual(deriveRemovable(events), [
+    { kind: "adjust", id: "bbbbbbb2" },
+    { kind: "entry", id: "aaaaaaa1" },
+  ])
+})
+
+test("deriveRemovable omits tombstoned items", () => {
+  const events = [
+    adjust("aaaaaaa1", "acme", "2025-10-23", 3000),
+    adjust("bbbbbbb2", "beta", "2025-10-23", -600),
+    del("ccccccc3", "aaaaaaa1"),
+  ]
+  assert.deepEqual(deriveRemovable(events), [{ kind: "adjust", id: "bbbbbbb2" }])
+})
+
+test("deriveRemovable never lists the open Timer", () => {
+  assert.deepEqual(deriveRemovable([start("aaaaaaa1", "acme", "09:12")]), [])
 })

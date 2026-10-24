@@ -2,6 +2,8 @@ import type { StartResult } from "../../../application/start-task.ts"
 import type { StatusResult } from "../../../application/status.ts"
 import type { StopResult } from "../../../application/stop-task.ts"
 import type { SwitchResult } from "../../../application/switch-task.ts"
+import type { AdjustmentResult } from "../../../application/adjustment.ts"
+import type { RemoveResult } from "../../../application/remove-entry.ts"
 import { formatLocalTime } from "../../../domain/datetime.ts"
 import { formatDuration } from "../../../domain/duration.ts"
 
@@ -63,4 +65,27 @@ export function renderSwitched(result: SwitchResult): string {
 
 function elapsedSeconds(start: Date, end: Date): number {
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000))
+}
+
+/** Confirmation for `add`/`sub` (SPEC §8.1): a signed Adjustment line. */
+export function renderAdjusted(result: AdjustmentResult): string {
+  const adjustment = result.adjustment
+  const note = adjustment.note === undefined ? "" : ` — ${adjustment.note}`
+  return `${formatSignedDuration(adjustment.delta)} ${adjustment.project} · ${adjustment.date}${note}\n`
+}
+
+/** Confirmation for `rm` (SPEC §8.1): the tombstoned Entry or Adjustment. */
+export function renderRemoved(result: RemoveResult): string {
+  if (result.removed.kind === "entry") {
+    const removed = result.removed.entry
+    const duration = elapsedSeconds(removed.start, removed.end)
+    return `○ removed ${removed.project} ${formatDuration(duration)}\n`
+  }
+  const removed = result.removed.adjustment
+  return `○ removed adjustment ${formatSignedDuration(removed.delta)} ${removed.project}\n`
+}
+
+function formatSignedDuration(delta: number): string {
+  const sign = delta < 0 ? "−" : "+"
+  return `${sign}${formatDuration(Math.abs(delta))}`
 }

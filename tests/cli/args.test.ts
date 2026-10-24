@@ -54,3 +54,17 @@ test("an unknown flag is a usage error", () => {
 test("--dir with no value is a usage error", () => {
   assert.throws(() => parseArgs(["status", "--dir"]), UsageError)
 })
+
+test("--date and --note take values in both forms", () => {
+  assert.equal(parseArgs(["add", "acme", "30m", "--date", "today"]).options.date, "today")
+  assert.equal(parseArgs(["add", "acme", "30m", "--date=yesterday"]).options.date, "yesterday")
+  assert.equal(parseArgs(["add", "acme", "30m", "--note", "forgot"]).options.note, "forgot")
+  assert.equal(parseArgs(["add", "acme", "30m", "--note=late"]).options.note, "late")
+  assert.equal(parseArgs(["status"]).options.date, null)
+  assert.equal(parseArgs(["status"]).options.note, null)
+})
+
+test("--date and --note with no value are usage errors", () => {
+  assert.throws(() => parseArgs(["add", "acme", "30m", "--date"]), UsageError)
+  assert.throws(() => parseArgs(["add", "acme", "30m", "--note"]), UsageError)
+})

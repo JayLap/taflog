@@ -92,6 +92,46 @@ export function deriveAdjustments(events: Event[]): Adjustment[] {
   return reduceEvents(events).adjustments
 }
 
+/** A live Entry or Adjustment that `rm` may tombstone. */
+export interface Removable {
+  kind: "entry" | "adjust"
+  id: string
+}
+
+/**
+ * Live Entries and Adjustments in Log order, for bare `rm` (SPEC §8.1, §10).
+ * An Entry is listed when it closes; the open Timer is never listed, because
+ * it is not a completed Entry.
+ */
+export function deriveRemovable(events: Event[]): Removable[] {
+  const items: Removable[] = []
+  const open = new Set<string>()
+  const deleted = new Set<string>()
+
+  for (const event of events) {
+    switch (event.t) {
+      case "start":
+        open.add(event.id)
+        break
+      case "switch":
+        if (open.delete(event.from)) items.push({ kind: "entry", id: event.from })
+        open.add(event.id)
+        break
+      case "stop":
+        if (open.delete(event.entry)) items.push({ kind: "entry", id: event.entry })
+        break
+      case "adjust":
+        items.push({ kind: "adjust", id: event.id })
+        break
+      case "delete":
+        deleted.add(event.entry)
+        break
+    }
+  }
+
+  return items.filter((item) => !deleted.has(item.id))
+}
+
 /**
  * The Timer is the most recent unclosed Entry. Valid logs hold at most one;
  * when a log has an orphan, the latest open Entry wins (SPEC §10).

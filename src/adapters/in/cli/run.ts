@@ -1,3 +1,5 @@
+import type { AddAdjustment, SubAdjustment } from "../../../application/adjustment.ts"
+import type { RemoveEntry } from "../../../application/remove-entry.ts"
 import type { StartTask } from "../../../application/start-task.ts"
 import type { ShowStatus } from "../../../application/status.ts"
 import type { StopTask } from "../../../application/stop-task.ts"
@@ -6,6 +8,8 @@ import { UsageError } from "../../../application/errors.ts"
 import { TaflogError } from "../../../domain/errors.ts"
 import type { ParsedArgs } from "./args.ts"
 import {
+  renderAdjusted,
+  renderRemoved,
   renderStarted,
   renderStatus,
   renderStopped,
@@ -19,6 +23,9 @@ export interface CliDeps {
   stopTask: StopTask
   switchTask: SwitchTask
   showStatus: ShowStatus
+  addAdjustment: AddAdjustment
+  subAdjustment: SubAdjustment
+  removeEntry: RemoveEntry
   version: string
   stdout: (chunk: string) => void
   stderr: (chunk: string) => void
@@ -109,6 +116,31 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         })
         warnSkipped(result.skipped, deps)
         deps.stdout(renderSwitched(result))
+        return 0
+      }
+      case "add":
+      case "sub": {
+        const [project, duration, ...rest] = parsed.operands
+        if (project === undefined || duration === undefined || rest.length > 0) {
+          throw new UsageError(`${command} requires <project> <duration>`)
+        }
+        const task = command === "add" ? deps.addAdjustment : deps.subAdjustment
+        const result = await task.execute({
+          project,
+          duration,
+          ...(parsed.options.date === null ? {} : { date: parsed.options.date }),
+          ...(parsed.options.note === null ? {} : { note: parsed.options.note }),
+        })
+        warnSkipped(result.skipped, deps)
+        deps.stdout(renderAdjusted(result))
+        return 0
+      }
+      case "rm": {
+        if (parsed.operands.length > 1) throw new UsageError("rm takes at most one <id>")
+        const id = parsed.operands[0]
+        const result = await deps.removeEntry.execute(id === undefined ? {} : { id })
+        warnSkipped(result.skipped, deps)
+        deps.stdout(renderRemoved(result))
         return 0
       }
       default:

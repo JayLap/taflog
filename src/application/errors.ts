@@ -37,3 +37,27 @@ export class ForgottenTimerError extends TaflogError {
     this.name = "ForgottenTimerError"
   }
 }
+
+/** `rm` targeting the open Timer (SPEC §10): a running interval is never destroyed. */
+export class RunningEntryError extends TaflogError {
+  constructor() {
+    super("that entry is running — stop it first")
+    this.name = "RunningEntryError"
+  }
+}
+
+/** Bare `rm` with no live Entry or Adjustment to tombstone (SPEC §8.1). */
+export class NothingToRemoveError extends TaflogError {
+  constructor() {
+    super("nothing to remove")
+    this.name = "NothingToRemoveError"
+  }
+}
+
+/** `rm <id>` where no Entry or Adjustment matches the id or prefix (SPEC §4.4). */
+export class UnknownEntryError extends TaflogError {
+  constructor(id: string) {
+    super(`no entry or adjustment matches "${id}"`)
+    this.name = "UnknownEntryError"
+  }
+}

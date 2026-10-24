@@ -4,6 +4,8 @@ import {
   formatLocalDate,
   formatLocalTime,
   overlapSeconds,
+  parseDate,
+  parseLocalDate,
   startOfLocalDay,
   startOfNextLocalDay,
 } from "../../src/domain/datetime.ts"
@@ -36,4 +38,43 @@ test("overlapSeconds clips an interval to the window", () => {
   assert.equal(overlapSeconds(start, end, from, to), 1800)
   assert.equal(overlapSeconds(start, end, new Date(2025, 9, 23, 10, 0), to), 0)
   assert.equal(overlapSeconds(start, end, new Date(2025, 9, 23, 8, 0), new Date(2025, 9, 23, 9, 15)), 900)
+})
+
+test("parseLocalDate accepts real calendar dates and rejects impossible ones", () => {
+  assert.equal(formatLocalDate(parseLocalDate("2025-10-23")!), "2025-10-23")
+  assert.equal(formatLocalDate(parseLocalDate("2024-02-29")!), "2024-02-29")
+  assert.equal(parseLocalDate("2023-02-29"), null)
+  assert.equal(parseLocalDate("2025-02-30"), null)
+  assert.equal(parseLocalDate("2025-13-01"), null)
+  assert.equal(parseLocalDate("2025/10/23"), null)
+  assert.equal(parseLocalDate(""), null)
+})
+
+test("parseDate resolves absolute, relative, and weekday forms to local dates", () => {
+  // Thursday 2025-10-23, 13:05 local.
+  const now = new Date(2025, 9, 23, 13, 5)
+  assert.equal(parseDate("2025-10-23", now), "2025-10-23")
+  assert.equal(parseDate("today", now), "2025-10-23")
+  assert.equal(parseDate("yesterday", now), "2025-10-22")
+  assert.equal(parseDate("mon", now), "2025-10-20")
+  assert.equal(parseDate("thu", now), "2025-10-23")
+  assert.equal(parseDate("sun", now), "2025-10-26")
+  assert.equal(parseDate("MON", now), "2025-10-20")
+  assert.equal(parseDate(" 2025-10-23 ", now), "2025-10-23")
+})
+
+test("parseDate returns null for malformed or impossible input", () => {
+  const now = new Date(2025, 9, 23, 13, 5)
+  for (const input of ["", "nope", "monday", "2025-02-30", "2025/10/23", "next monday", "13"]) {
+    assert.equal(parseDate(input, now), null, `parseDate(${JSON.stringify(input)})`)
+  }
+})
+
+test("parseDate weekday resolution follows weekStart", () => {
+  // Sunday 2025-10-26, 12:00 local.
+  const now = new Date(2025, 9, 26, 12, 0)
+  assert.equal(parseDate("sun", now, "monday"), "2025-10-26")
+  assert.equal(parseDate("sat", now, "monday"), "2025-10-25")
+  assert.equal(parseDate("sun", now, "sunday"), "2025-10-26")
+  assert.equal(parseDate("sat", now, "sunday"), "2025-11-01")
 })
