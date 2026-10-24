@@ -41,6 +41,12 @@ test("--help, --version and --strict are booleans", () => {
   assert.equal(parsed.options.strict, true)
 })
 
+test("--force is a boolean accepted before or after the command", () => {
+  assert.equal(parseArgs(["stop", "--force"]).options.force, true)
+  assert.equal(parseArgs(["--force", "switch", "beta"]).options.force, true)
+  assert.equal(parseArgs(["stop"]).options.force, false)
+})
+
 test("an unknown flag is a usage error", () => {
   assert.throws(() => parseArgs(["status", "--nope"]), UsageError)
 })

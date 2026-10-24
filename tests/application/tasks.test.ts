@@ -5,6 +5,7 @@ import { StartTask } from "../../src/application/start-task.ts"
 import { StopTask } from "../../src/application/stop-task.ts"
 import { ShowStatus } from "../../src/application/status.ts"
 import { AlreadyRunningError, NothingRunningError } from "../../src/application/errors.ts"
+import { ForgottenTimerError } from "../../src/application/errors.ts"
 import { formatLocalDate } from "../../src/domain/datetime.ts"
 import type { Event } from "../../src/domain/events.ts"
 
@@ -72,6 +73,28 @@ test("StopTask fails when nothing is running", async () => {
     () => new StopTask(clock, log).execute({}),
     (error: unknown) => error instanceof NothingRunningError,
   )
+})
+
+test("StopTask refuses to close a forgotten Timer without force", async () => {
+  const clock = new FakeClock("2025-10-23T09:00:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T18:00:00")
+  await assert.rejects(
+    () => new StopTask(clock, log).execute({}),
+    (error: unknown) => error instanceof ForgottenTimerError && /acme/.test(error.message),
+  )
+  assert.equal(log.events.length, 1)
+})
+
+test("StopTask closes a forgotten Timer with force", async () => {
+  const clock = new FakeClock("2025-10-23T09:00:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T18:00:00")
+  const result = await new StopTask(clock, log).execute({ force: true })
+  assert.equal(result.entry.project, "acme")
+  assert.equal(log.events.length, 2)
 })
 
 test("ShowStatus reports the running Timer and today's timed total", async () => {

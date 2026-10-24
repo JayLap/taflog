@@ -10,6 +10,7 @@ import { UsageError } from "./application/errors.ts"
 import { StartTask } from "./application/start-task.ts"
 import { ShowStatus } from "./application/status.ts"
 import { StopTask } from "./application/stop-task.ts"
+import { SwitchTask } from "./application/switch-task.ts"
 import { version } from "./version.ts"
 
 /**
@@ -34,6 +35,7 @@ async function main(): Promise<void> {
   const code = await runCli(parsed, {
     startTask: new StartTask(clock, log),
     stopTask: new StopTask(clock, log),
+    switchTask: new SwitchTask(clock, log),
     showStatus: new ShowStatus(clock, log),
     version: version(),
     stdout: (chunk) => process.stdout.write(chunk),

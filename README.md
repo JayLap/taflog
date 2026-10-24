@@ -12,12 +12,15 @@ correct the record when you forget, and read back where the hours went.
 
 ## Status
 
-🚧 **Phase 1 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
-`status` persist Event lines to the Log and read them back; `--dir`, `--json`,
-corrupt-line warnings, and `--strict` are in place. The design is settled in
-[`SPEC.md`](./SPEC.md), decisions are recorded in [`docs/adr/`](./docs/adr), and
-vocabulary follows [`GLOSSARY.md`](./GLOSSARY.md). Later phases add `switch`,
-corrections, and the read commands.
+🚧 **Phase 2 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
+`switch` manage the running Timer; `status` reports it. Persistence is
+append-only NDJSON with `--dir`, `--json`, corrupt-line warnings, and
+`--strict`. `start` while running and `stop` while idle are refused, and a
+forgotten Timer (`maxTimerHours`, default 8) needs `--force` to close. The
+design is settled in [`SPEC.md`](./SPEC.md), decisions are recorded in
+[`docs/adr/`](./docs/adr), and vocabulary follows
+[`GLOSSARY.md`](./GLOSSARY.md). Later phases add corrections and the read
+commands.
 
 ## Install
 

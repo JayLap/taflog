@@ -1,7 +1,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { renderStatus, statusJson } from "../../src/adapters/in/cli/present.ts"
+import { renderSwitched } from "../../src/adapters/in/cli/present.ts"
 import type { StatusResult } from "../../src/application/status.ts"
+import type { SwitchResult } from "../../src/application/switch-task.ts"
 import type { Entry, Timer } from "../../src/domain/entry.ts"
 
 function timer(project: string, description: string, start: Date): Timer {
@@ -69,4 +71,37 @@ test("statusJson is the frozen version-1 shape with seconds", () => {
     },
     today: { timedSeconds: 8040, adjustedSeconds: 3000, totalSeconds: 11040 },
   })
+})
+
+test("renderSwitched shows the closed Entry and the new Timer", () => {
+  const result: SwitchResult = {
+    skipped: 0,
+    event: {
+      v: 1,
+      id: "bbbbbbb2",
+      t: "switch",
+      at: "2025-10-23T09:36:00.000Z",
+      from: "aaaaaaa1",
+      project: "beta",
+    },
+    closed: entry("acme", "new parser", new Date(2025, 9, 23, 9, 12), new Date(2025, 9, 23, 9, 36)),
+    timer: timer("beta", "emails", new Date(2025, 9, 23, 9, 36)),
+  }
+  assert.equal(renderSwitched(result), "○ acme 24m → ● beta — running since 09:36\n")
+})
+
+test("renderSwitched while idle renders like start", () => {
+  const result: SwitchResult = {
+    skipped: 0,
+    event: {
+      v: 1,
+      id: "bbbbbbb2",
+      t: "start",
+      at: "2025-10-23T09:36:00.000Z",
+      project: "beta",
+    },
+    closed: null,
+    timer: timer("beta", "emails", new Date(2025, 9, 23, 9, 36)),
+  }
+  assert.equal(renderSwitched(result), "● beta — running since 09:36\n")
 })

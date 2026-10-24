@@ -147,3 +147,13 @@ test("reduceEvents returns the whole derived state", () => {
   assert.deepEqual(state.entries, [])
   assert.deepEqual(state.adjustments, [])
 })
+
+test("an Adjustment is independent of a running Timer", () => {
+  const events = [
+    start("aaaaaaa1", "acme", "09:12"),
+    adjust("bbbbbbb2", "beta", "2025-10-23", 3000),
+  ]
+  const state = reduceEvents(events)
+  assert.equal(state.timer?.id, "aaaaaaa1")
+  assert.deepEqual(state.adjustments.map((adjustment) => adjustment.project), ["beta"])
+})

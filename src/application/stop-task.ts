@@ -2,12 +2,14 @@ import type { StopEvent } from "../domain/events.ts"
 import type { Entry } from "../domain/entry.ts"
 import { newId } from "../domain/identity.ts"
 import { deriveTimer } from "../domain/reduce.ts"
+import { DEFAULT_MAX_TIMER_HOURS, isForgotten } from "../domain/timer.ts"
 import type { Clock } from "../ports/clock.ts"
 import type { EventLog } from "../ports/event-log.ts"
-import { NothingRunningError } from "./errors.ts"
+import { ForgottenTimerError, NothingRunningError } from "./errors.ts"
 
 export interface StopInput {
   description?: string
+  force?: boolean
 }
 
 export interface StopResult {
@@ -21,11 +23,18 @@ export class StopTask {
   private readonly clock: Clock
   private readonly log: EventLog
   private readonly generateId: () => string
+  private readonly maxTimerHours: number
 
-  constructor(clock: Clock, log: EventLog, generateId: () => string = newId) {
+  constructor(
+    clock: Clock,
+    log: EventLog,
+    generateId: () => string = newId,
+    maxTimerHours: number = DEFAULT_MAX_TIMER_HOURS,
+  ) {
     this.clock = clock
     this.log = log
     this.generateId = generateId
+    this.maxTimerHours = maxTimerHours
   }
 
   async execute(input: StopInput): Promise<StopResult> {
@@ -35,9 +44,13 @@ export class StopTask {
       throw new NothingRunningError()
     }
 
+    const at = this.clock.now()
+    if (input.force !== true && isForgotten(running, at, this.maxTimerHours)) {
+      throw new ForgottenTimerError(running.project, running.start, this.maxTimerHours)
+    }
+
     const description =
       input.description === undefined || input.description === "" ? undefined : input.description
-    const at = this.clock.now()
     const event: StopEvent = {
       v: 1,
       id: this.generateId(),

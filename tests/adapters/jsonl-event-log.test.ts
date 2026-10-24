@@ -22,10 +22,10 @@ const stopEvent: Event = {
   entry: "aaaaaaa1",
 }
 
-function withTempDir<T>(fn: (file: string) => T): T {
+async function withTempDir<T>(fn: (file: string) => T | Promise<T>): Promise<T> {
   const dir = mkdtempSync(join(tmpdir(), "taflog-store-"))
   try {
-    return fn(join(dir, "events.ndjson"))
+    return await fn(join(dir, "events.ndjson"))
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

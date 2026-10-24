@@ -8,6 +8,7 @@ export interface GlobalOptions {
   noColor: boolean
   icons: IconsProfile | null
   strict: boolean
+  force: boolean
   help: boolean
   version: boolean
 }
@@ -31,6 +32,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     noColor: false,
     icons: null,
     strict: false,
+    force: false,
     help: false,
     version: false,
   }
@@ -59,6 +61,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
     if (arg === "--strict") {
       options.strict = true
+      continue
+    }
+    if (arg === "--force") {
+      options.force = true
       continue
     }
     if (arg === "--dir") {

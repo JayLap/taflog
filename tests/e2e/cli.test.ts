@@ -31,6 +31,15 @@ function withTempDir<T>(fn: (dir: string) => T): T {
   }
 }
 
+/** Seed an open Entry that started `hours` ago, as if the Timer were forgotten. */
+function seedForgottenStart(dir: string, hours: number): void {
+  const at = new Date(Date.now() - hours * 3_600_000).toISOString()
+  appendFileSync(
+    join(dir, "events.ndjson"),
+    `${JSON.stringify({ v: 1, id: "oldstart", t: "start", at, project: "acme" })}\n`,
+  )
+}
+
 test("a running Timer persists across process invocations", () => {
   withTempDir((dir) => {
     const started = run(dir, ["start", "acme", "writing tests"])
@@ -105,6 +114,65 @@ test("stop while idle reports a runtime error", () => {
     const result = run(dir, ["stop"])
     assert.equal(result.status, 1)
     assert.match(result.stderr, /nothing is running/)
+  })
+})
+
+test("switch closes the running Timer and starts the next", () => {
+  withTempDir((dir) => {
+    assert.equal(run(dir, ["start", "acme", "draft"]).status, 0)
+    const switched = run(dir, ["switch", "beta", "emails"])
+    assert.equal(switched.status, 0)
+
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.running.project, "beta")
+    assert.equal(status.running.description, "emails")
+
+    const events = readFileSync(join(dir, "events.ndjson"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { t: string; id: string; from?: string })
+    assert.equal(events.length, 2)
+    assert.equal(events[1]?.t, "switch")
+    assert.equal(events[1]?.from, events[0]?.id)
+  })
+})
+
+test("switch while idle opens a Timer", () => {
+  withTempDir((dir) => {
+    const result = run(dir, ["switch", "beta"])
+    assert.equal(result.status, 0)
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.running.project, "beta")
+
+    const events = readFileSync(join(dir, "events.ndjson"), "utf8").trim().split("\n")
+    assert.equal(events.length, 1)
+    assert.equal((JSON.parse(events[0]!) as { t: string }).t, "start")
+  })
+})
+
+test("stop refuses to close a forgotten Timer without --force", () => {
+  withTempDir((dir) => {
+    seedForgottenStart(dir, 9)
+    const refused = run(dir, ["stop"])
+    assert.equal(refused.status, 1)
+    assert.match(refused.stderr, /--force/)
+
+    const forced = run(dir, ["stop", "--force"])
+    assert.equal(forced.status, 0)
+  })
+})
+
+test("switch refuses to close a forgotten Timer without --force", () => {
+  withTempDir((dir) => {
+    seedForgottenStart(dir, 9)
+    const refused = run(dir, ["switch", "beta"])
+    assert.equal(refused.status, 1)
+    assert.match(refused.stderr, /--force/)
+
+    const forced = run(dir, ["switch", "--force", "beta"])
+    assert.equal(forced.status, 0)
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.running.project, "beta")
   })
 })
 

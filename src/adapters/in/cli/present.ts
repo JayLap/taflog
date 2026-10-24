@@ -1,6 +1,7 @@
 import type { StartResult } from "../../../application/start-task.ts"
 import type { StatusResult } from "../../../application/status.ts"
 import type { StopResult } from "../../../application/stop-task.ts"
+import type { SwitchResult } from "../../../application/switch-task.ts"
 import { formatLocalTime } from "../../../domain/datetime.ts"
 import { formatDuration } from "../../../domain/duration.ts"
 
@@ -48,6 +49,16 @@ export function renderStarted(result: StartResult): string {
 export function renderStopped(result: StopResult): string {
   const duration = elapsedSeconds(result.entry.start, result.entry.end)
   return `○ stopped ${result.entry.project} · ${formatDuration(duration)}\n`
+}
+
+/** Confirmation for `switch` (SPEC §10). */
+export function renderSwitched(result: SwitchResult): string {
+  const started = `● ${result.timer.project} — running since ${formatLocalTime(result.timer.start)}`
+  if (result.closed === null) {
+    return `${started}\n`
+  }
+  const duration = elapsedSeconds(result.closed.start, result.closed.end)
+  return `○ ${result.closed.project} ${formatDuration(duration)} → ${started}\n`
 }
 
 function elapsedSeconds(start: Date, end: Date): number {

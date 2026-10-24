@@ -1,15 +1,23 @@
 import type { StartTask } from "../../../application/start-task.ts"
 import type { ShowStatus } from "../../../application/status.ts"
 import type { StopTask } from "../../../application/stop-task.ts"
+import type { SwitchTask } from "../../../application/switch-task.ts"
 import { UsageError } from "../../../application/errors.ts"
 import { TaflogError } from "../../../domain/errors.ts"
 import type { ParsedArgs } from "./args.ts"
-import { renderStarted, renderStatus, renderStopped, statusJson } from "./present.ts"
+import {
+  renderStarted,
+  renderStatus,
+  renderStopped,
+  renderSwitched,
+  statusJson,
+} from "./present.ts"
 
 /** Everything the CLI needs, injected by the composition root (ADR-0005). */
 export interface CliDeps {
   startTask: StartTask
   stopTask: StopTask
+  switchTask: SwitchTask
   showStatus: ShowStatus
   version: string
   stdout: (chunk: string) => void
@@ -38,6 +46,7 @@ Global flags:
   --no-color                disable colour
   --icons <auto|nerd|ascii> glyph profile
   --strict                  fail on unreadable log lines
+  --force                   close a forgotten running Timer
   -h, --help                show this help
   -V, --version             show version
 
@@ -81,11 +90,25 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
       }
       case "stop": {
         const description = joinOperands(parsed.operands)
-        const result = await deps.stopTask.execute(
-          description === undefined ? {} : { description },
-        )
+        const result = await deps.stopTask.execute({
+          ...(description === undefined ? {} : { description }),
+          ...(parsed.options.force ? { force: true } : {}),
+        })
         warnSkipped(result.skipped, deps)
         deps.stdout(renderStopped(result))
+        return 0
+      }
+      case "switch": {
+        const project = parsed.operands[0]
+        if (project === undefined) throw new UsageError("switch requires a <project>")
+        const description = joinOperands(parsed.operands.slice(1))
+        const result = await deps.switchTask.execute({
+          project,
+          ...(description === undefined ? {} : { description }),
+          ...(parsed.options.force ? { force: true } : {}),
+        })
+        warnSkipped(result.skipped, deps)
+        deps.stdout(renderSwitched(result))
         return 0
       }
       default:
