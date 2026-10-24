@@ -16,7 +16,7 @@ promise. Two facts were verified on Node v24.19.0:
 ## Decision
 
 Source is TypeScript under `src/`. `tsc` compiles it to `dist/`; `package.json`
-declares `bin: { "taflog": "dist/cli.js" }`, `files: ["dist"]`, and runs the
+declares `bin: { "taflog": "dist/main.js" }`, `files: ["dist"]`, and runs the
 build from `prepare` so `npm pack`/`npm publish` always ship compiled output.
 There are **no runtime dependencies**. Dev dependencies are `typescript` and
 `@types/node`. `engines.node` is `>= 20` for consumers; contributors who want
@@ -35,6 +35,11 @@ the no-build loop (`node src/cli.ts`) use Node `>= 24`.
 
 - `tsconfig.json` sets `erasableSyntaxOnly` so source stays compatible with
   Node's stripper; no `enum`, `namespace`, or parameter properties.
+- Relative imports in source carry explicit `.ts` extensions. Combined with
+  `allowImportingTsExtensions` + `rewriteRelativeImportExtensions`, `tsc` emits
+  `.js` specifiers, so the same source runs under Node's stripper
+  (`node src/main.ts`) and as compiled output (`dist/`). Verified on
+  TypeScript 7.0.2 (the native compiler); the project tracks the 7.x line.
 - The published tarball contains only `dist/` and `package.json`.
 - Release must build before packing; the smoke test is `npm pack` →
   `npm install -g` into a temp prefix → run the CLI (verified working).

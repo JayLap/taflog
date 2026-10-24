@@ -20,10 +20,10 @@ Guarantees:
 
 ## 2. Stack and packaging
 
-- TypeScript, `strict` + `erasableSyntaxOnly`, compiled by `tsc` to `dist/`.
+- TypeScript 7.x (native compiler), `strict` + `erasableSyntaxOnly`, compiled by `tsc` to `dist/`.
 - Node `>= 20` to run the installed CLI; Node `>= 24` for the no-build dev loop.
 - Zero runtime dependencies. Dev: `typescript`, `@types/node`.
-- `bin: { "taflog": "dist/cli.js" }`, `files: ["dist"]`, built from `prepare`.
+- `bin: { "taflog": "dist/main.js" }`, `files: ["dist"]`, built from `prepare`.
 - Package name `taflog`, MIT. See ADR-0003.
 
 ## 3. Architecture

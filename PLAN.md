@@ -16,7 +16,7 @@ definition of done (DoD); later phases must not invalidate earlier ones.
 
 **Ships**
 - Rewritten `README.md`, `GLOSSARY.md`, `SPEC.md`, `PLAN.md`, ADRs 0001–0005.
-- `package.json`: `bin: dist/cli.js`, `files: ["dist"]`, `engines >=20`, scripts
+- `package.json`: `bin: dist/main.js`, `files: ["dist"]`, `engines >=20`, scripts
   `build`/`typecheck`/`test`/`start`/`prepare`, devDeps `typescript`,
   `@types/node`.
 - `tsconfig.json` (`strict`, `erasableSyntaxOnly`, `module: NodeNext`).
@@ -25,7 +25,7 @@ definition of done (DoD); later phases must not invalidate earlier ones.
 
 **DoD**
 - `npm run build`, `npm run typecheck`, `npm test` pass.
-- `node dist/cli.js --help` prints usage.
+- `node dist/main.js --help` prints usage.
 - `npm pack` tarball contains only `dist/` + `package.json`.
 - No document contradicts `package.json` or the README.
 

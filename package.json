@@ -4,17 +4,21 @@
   "description": "Minimalist CLI time tracker for your job. \"Taf\" is French slang for work.",
   "type": "module",
   "bin": {
-    "taflog": "src/cli.js"
+    "taflog": "dist/main.js"
   },
   "files": [
-    "src"
+    "dist"
   ],
   "scripts": {
-    "start": "node src/cli.js",
-    "test": "node --test"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node src/main.ts",
+    "pretest": "npm run build",
+    "test": "node --test",
+    "prepare": "npm run build"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "keywords": [
     "cli",
@@ -36,5 +40,9 @@
   "bugs": {
     "url": "https://github.com/jelap/taflog/issues"
   },
-  "homepage": "https://github.com/jelap/taflog#readme"
+  "homepage": "https://github.com/jelap/taflog#readme",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^7.0.2"
+  }
 }
