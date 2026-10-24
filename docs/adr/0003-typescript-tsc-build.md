@@ -20,7 +20,7 @@ declares `bin: { "taflog": "dist/main.js" }`, `files: ["dist"]`, and runs the
 build from `prepare` so `npm pack`/`npm publish` always ship compiled output.
 There are **no runtime dependencies**. Dev dependencies are `typescript` and
 `@types/node`. `engines.node` is `>= 20` for consumers; contributors who want
-the no-build loop (`node src/cli.ts`) use Node `>= 24`.
+the no-build loop (`node src/main.ts`) use Node `>= 24`.
 
 ## Considered Options
 

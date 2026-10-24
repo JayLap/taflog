@@ -38,15 +38,26 @@ src/
   application/   one use case per command: StartTask, StopTask, SwitchTask,
                  ShowStatus, AddAdjustment, SubAdjustment, RemoveEntry,
                  QueryLog, BuildReport
-  adapters/      SystemClock, JsonlEventLog, config resolver, renderers
-  cli/           arg parsing, dispatch, terminal and JSON presenters
+  adapters/
+    in/cli/      arg parsing, dispatch, terminal and JSON presenters
+    out/clock/   SystemClock
+    out/store/   JsonlEventLog
+    out/config/  config resolver
   main.ts        composition root
 ```
 
 Dependency rule: `domain` imports nothing project-local; `application` imports
-`domain` + `ports`; `adapters` import `ports`; `cli`/`main` import everything.
-Use cases return plain data; the CLI renders it, so colour and JSON never cross
-a port.
+`domain` + `ports`; `adapters/out/**` implement `ports`; `adapters/in/cli/**`
+imports `application` (+ `domain` for display helpers) but never `ports` or
+`adapters/out/**`; `main.ts` is the only module that imports both sides.
+
+`adapters/in/cli/` is the **driving adapter** — the analogue of picava's `ui/`.
+It turns `argv` into use-case calls and use-case results into terminal or JSON
+output. Keeping it out of `application/` means the core never knows
+`process.argv`, ANSI, or exit codes, so use cases stay testable with fakes and
+can be driven by another adapter (an agent tool, a library API) later. Use
+cases return plain data; the CLI renders it, so colour and JSON never cross a
+port. The driving/driven split is ADR-0006.
 
 ## 4. Data model
 

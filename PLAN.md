@@ -20,8 +20,9 @@ definition of done (DoD); later phases must not invalidate earlier ones.
   `build`/`typecheck`/`test`/`start`/`prepare`, devDeps `typescript`,
   `@types/node`.
 - `tsconfig.json` (`strict`, `erasableSyntaxOnly`, `module: NodeNext`).
-- `src/{domain,ports,application,adapters,cli}`, `tests/`; `.gitignore` cleanup
-  (drop `.taflog/`, keep `dist/`).
+- `src/{domain,ports,application}` and
+  `src/adapters/{in/cli,out/clock,out/store,out/config}`, `tests/`; `.gitignore`
+  cleanup (drop `.taflog/`, keep `dist/`).
 
 **DoD**
 - `npm run build`, `npm run typecheck`, `npm test` pass.

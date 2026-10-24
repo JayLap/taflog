@@ -1,58 +1,49 @@
 #!/usr/bin/env node
+import { join } from "node:path"
+import type { ParsedArgs } from "./adapters/in/cli/args.ts"
+import { parseArgs } from "./adapters/in/cli/args.ts"
+import { runCli } from "./adapters/in/cli/run.ts"
+import { SystemClock } from "./adapters/out/clock/system-clock.ts"
+import { JsonlEventLog } from "./adapters/out/store/jsonl-event-log.ts"
+import { defaultDataDir } from "./adapters/out/store/paths.ts"
+import { UsageError } from "./application/errors.ts"
+import { StartTask } from "./application/start-task.ts"
+import { ShowStatus } from "./application/status.ts"
+import { StopTask } from "./application/stop-task.ts"
 import { version } from "./version.ts"
 
 /**
- * taflog entry point (composition root, SPEC §3).
- *
- * Phase 0: usage and version only. Later phases wire
- * adapters -> use cases -> cli here, by hand (no DI framework).
+ * Composition root (SPEC §3, ADR-0005): the only module that imports both the
+ * driving adapter and the driven adapters, and wires them by hand.
  */
-const USAGE = `taflog — minimalist CLI time tracker
+async function main(): Promise<void> {
+  let parsed: ParsedArgs
+  try {
+    parsed = parseArgs(process.argv.slice(2))
+  } catch (error) {
+    const message = error instanceof UsageError ? error.message : "invalid arguments"
+    process.stderr.write(`taflog: ${message}\n`)
+    process.stderr.write("Run `taflog --help` for usage.\n")
+    process.exit(2)
+  }
 
-Usage:
-  taflog start <project> [description]
-  taflog stop [description]
-  taflog switch <project> [description]
-  taflog status
-  taflog log [filters]
-  taflog report [filters]
-  taflog add <project> <duration> [--date D] [--note N]
-  taflog sub <project> <duration> [--date D] [--note N]
-  taflog rm [<id>]
-  taflog config [<key>]
-  taflog set <key> <value>
-  taflog export
+  const dir = parsed.options.dir ?? process.env.TAFLOG_DIR ?? defaultDataDir()
+  const clock = new SystemClock()
+  const log = new JsonlEventLog(join(dir, "events.ndjson"), { strict: parsed.options.strict })
 
-Global flags:
-  --dir <path>              data directory
-  --json                    machine-readable output
-  --no-color                disable colour
-  --icons <auto|nerd|ascii> glyph profile
-  --strict                  fail on unreadable log lines
-  -h, --help                show this help
-  -V, --version             show version
-
-Docs: README.md · SPEC.md · PLAN.md · GLOSSARY.md
-`
-
-const args = process.argv.slice(2)
-
-if (args.includes("-h") || args.includes("--help") || args[0] === "help") {
-  process.stdout.write(USAGE)
-  process.exit(0)
+  const code = await runCli(parsed, {
+    startTask: new StartTask(clock, log),
+    stopTask: new StopTask(clock, log),
+    showStatus: new ShowStatus(clock, log),
+    version: version(),
+    stdout: (chunk) => process.stdout.write(chunk),
+    stderr: (chunk) => process.stderr.write(chunk),
+  })
+  process.exit(code)
 }
 
-if (args.includes("-V") || args.includes("--version")) {
-  process.stdout.write(`${version()}\n`)
-  process.exit(0)
-}
-
-// Phase 0 stub: command dispatch lands in Phase 1.
-if (args.length === 0) {
-  process.stdout.write(USAGE)
-  process.exit(0)
-}
-
-process.stderr.write(`taflog: not implemented yet: ${args.join(" ")}\n`)
-process.stderr.write("Run `taflog --help` for usage.\n")
-process.exit(2)
+main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  process.stderr.write(`taflog: ${message}\n`)
+  process.exit(1)
+})

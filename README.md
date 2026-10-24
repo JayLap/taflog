@@ -12,10 +12,12 @@ correct the record when you forget, and read back where the hours went.
 
 ## Status
 
-🚧 **Pre-implementation.** The design is settled in [`SPEC.md`](./SPEC.md), the
-decisions are recorded in [`docs/adr/`](./docs/adr), and the build is sequenced
-in [`PLAN.md`](./PLAN.md). Vocabulary follows [`GLOSSARY.md`](./GLOSSARY.md).
-There is no source code yet.
+🚧 **Phase 1 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
+`status` persist Event lines to the Log and read them back; `--dir`, `--json`,
+corrupt-line warnings, and `--strict` are in place. The design is settled in
+[`SPEC.md`](./SPEC.md), decisions are recorded in [`docs/adr/`](./docs/adr), and
+vocabulary follows [`GLOSSARY.md`](./GLOSSARY.md). Later phases add `switch`,
+corrections, and the read commands.
 
 ## Install
 
@@ -83,8 +85,7 @@ $ taflog config
 
 ## Development
 
-The implementation has not started. Once [PLAN.md](./PLAN.md) Phase 1 lands,
-these will work:
+Once dependencies are installed, these work:
 
 ```console
 $ npm install
@@ -93,7 +94,7 @@ $ npm test           # node --test
 $ npm start -- --help
 ```
 
-Contributors who want the no-build loop (`node src/cli.ts`) need Node `>= 24`;
+Contributors who want the no-build loop (`node src/main.ts`) need Node `>= 24`;
 the published package supports Node `>= 20`.
 
 ## License
