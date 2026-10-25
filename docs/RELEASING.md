@@ -29,8 +29,8 @@ No `NPM_TOKEN` repository secret is required.
 2. Push a matching tag:
 
    ```console
-   $ git tag v0.1.0
-   $ git push origin v0.1.0
+   $ git tag v0.2.0
+   $ git push origin v0.2.0
    ```
 
 3. The workflow verifies the tag against `package.json`, runs `npm test`, and

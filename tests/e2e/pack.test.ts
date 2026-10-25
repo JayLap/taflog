@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -13,6 +13,9 @@ import { fileURLToPath } from "node:url"
  * and by a real release.
  */
 const root = fileURLToPath(new URL("../..", import.meta.url))
+const packageVersion = (
+  JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string }
+).version
 
 /**
  * Invoke npm portably. Under `npm test`, `npm_execpath` points at npm's JS
@@ -53,7 +56,7 @@ test("the packed tarball installs globally and the installed CLI runs", { timeou
       npmRun(["pack", "--json", "--ignore-scripts", "--pack-destination", packDir]),
     ) as Array<{ name: string; filename: string; version: string; files: Array<{ path: string }> }>
     const info = packed[0]!
-    assert.equal(info.version, "0.1.0")
+    assert.equal(info.version, packageVersion)
 
     const paths = info.files.map((file) => file.path)
     assert.ok(paths.includes("dist/main.js"), "tarball ships the CLI entry point")

@@ -1,12 +1,17 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { readFileSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const cli = fileURLToPath(new URL("../dist/main.js", import.meta.url))
+const packageVersion = (
+  JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+    version: string
+  }
+).version
 
 function run(...args: string[]): { stdout: string; status: number } {
   const dir = mkdtempSync(join(tmpdir(), "taflog-main-"))
@@ -34,7 +39,7 @@ test("--help prints usage", () => {
 test("--version prints the package version", () => {
   const { stdout, status } = run("--version")
   assert.equal(status, 0)
-  assert.equal(stdout.trim(), "0.1.0")
+  assert.equal(stdout.trim(), packageVersion)
 })
 
 test("an unknown command is a usage error", () => {
