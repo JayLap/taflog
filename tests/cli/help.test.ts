@@ -3,8 +3,8 @@ import assert from "node:assert/strict"
 import { USAGE } from "../../src/adapters/in/cli/run.ts"
 
 /**
- * The README, SPEC §8, and `--help` must agree (PLAN Phase 6). These tests pin
- * the command and flag surface so a drift fails the build.
+ * The README, docs/SPEC.md §8, and `--help` must agree. These tests pin the
+ * command and flag surface so a drift fails the build.
  */
 const COMMANDS = [
   "start",
@@ -50,7 +50,7 @@ test("usage lists every global flag from SPEC §8.2", () => {
 })
 
 test("usage points at the project docs", () => {
-  for (const doc of ["README.md", "SPEC.md", "PLAN.md", "GLOSSARY.md"]) {
+  for (const doc of ["README.md", "docs/SPEC.md", "docs/GLOSSARY.md"]) {
     assert.ok(USAGE.includes(doc), `usage is missing ${doc}`)
   }
 })

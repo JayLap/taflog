@@ -94,7 +94,7 @@ Global flags:
   -h, --help                show this help
   -V, --version             show version
 
-Docs: README.md · SPEC.md · PLAN.md · GLOSSARY.md
+Docs: README.md · docs/SPEC.md · docs/GLOSSARY.md
 `
 
 /**

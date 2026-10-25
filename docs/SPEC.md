@@ -1,8 +1,11 @@
 # taflog v1 — Specification
 
+> Implementation spec and source of truth for contributors and AI agents. For
+the user-facing overview, see the [README](../README.md).
+
 A minimalist, local-first CLI time tracker. Vocabulary follows
 [GLOSSARY.md](./GLOSSARY.md) exactly. Decisions are recorded in
-[`docs/adr/`](./docs/adr). The implementation order is in [PLAN.md](./PLAN.md).
+[`adr/`](./adr).
 
 ## 1. Intent
 
@@ -122,7 +125,7 @@ shows them; `rm` accepts a full id or an unambiguous prefix.
   stderr (`warning: skipped N unreadable lines`). `--strict` fails instead.
   `export` streams raw bytes and never parses, so nothing is unrecoverable.
 - **Growth**: append-only forever in v1; yearly rotation and `compact` are
-  deferred (PLAN).
+  deferred (§12).
 - **Permissions**: the data file is created with owner-only access where the
   platform allows it.
 
