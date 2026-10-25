@@ -13,7 +13,7 @@ function run(...args: string[]): { stdout: string; status: number } {
   try {
     const stdout = execFileSync(process.execPath, [cli, ...args], {
       encoding: "utf8",
-      env: { ...process.env, TAFLOG_DIR: dir },
+      env: { ...process.env, TAFLOG_DIR: dir, TAFLOG_CONFIG: join(dir, "config.json") },
     })
     return { stdout, status: 0 }
   } catch (err) {

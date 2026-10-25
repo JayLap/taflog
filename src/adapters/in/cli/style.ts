@@ -44,6 +44,9 @@ const PROFILES: Record<IconsProfile, Glyphs> = {
   ascii: ASCII,
 }
 
+/** Effective colour policy (SPEC §7, §9.4). */
+export type ColorPolicy = "auto" | "always" | "never"
+
 export interface StyleOptions {
   icons?: IconsProfile
   color?: boolean
@@ -113,27 +116,35 @@ export function truncate(text: string, max: number): string {
   return `${text.slice(0, max - 1)}…`
 }
 
-/** Effective glyph profile: `--icons` > `TAFLOG_ICONS` > `auto` (SPEC §9.4). */
+/**
+ * Effective glyph profile: `--icons` > `TAFLOG_ICONS` > config > `auto`
+ * (SPEC §7, §9.4). An unset or invalid env var falls through to `configured`.
+ */
 export function resolveIcons(
   flag: IconsProfile | null,
   env: NodeJS.ProcessEnv = process.env,
+  configured: IconsProfile = "auto",
 ): IconsProfile {
   if (flag !== null) return flag
   const value = env.TAFLOG_ICONS
   if (value === "auto" || value === "nerd" || value === "ascii") return value
-  return "auto"
+  return configured
 }
 
 /**
- * Colour is off for `--no-color`, `NO_COLOR`, or a non-TTY (SPEC §9.4).
- * `--json` is never coloured by its presenter.
+ * Colour is off for `--no-color`, `NO_COLOR`, `color: "never"`, or a non-TTY;
+ * `color: "always"` forces it on (SPEC §9.4). `--json` is never coloured by its
+ * presenter.
  */
 export function resolveColor(
   noColor: boolean,
   env: NodeJS.ProcessEnv = process.env,
   isTTY = false,
+  policy: ColorPolicy = "auto",
 ): boolean {
   if (noColor) return false
   if (env.NO_COLOR !== undefined) return false
+  if (policy === "always") return true
+  if (policy === "never") return false
   return isTTY
 }

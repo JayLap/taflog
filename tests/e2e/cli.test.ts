@@ -17,7 +17,7 @@ interface Run {
 function run(dir: string, args: string[], extraEnv: NodeJS.ProcessEnv = {}): Run {
   const result = spawnSync(process.execPath, [cli, ...args], {
     encoding: "utf8",
-    env: { ...process.env, TAFLOG_DIR: dir, ...extraEnv },
+    env: { ...process.env, TAFLOG_DIR: dir, TAFLOG_CONFIG: join(dir, "config.json"), ...extraEnv },
   })
   return { stdout: result.stdout ?? "", stderr: result.stderr ?? "", status: result.status }
 }

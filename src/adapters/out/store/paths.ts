@@ -2,8 +2,8 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 
 /**
- * Per-OS default data directory (ADR-0002, SPEC §5). `--dir` and `TAFLOG_DIR`
- * override it; config-file `dir` arrives in Phase 5.
+ * Per-OS default data directory (ADR-0002, SPEC §5). Precedence is `--dir` >
+ * `TAFLOG_DIR` > config-file `dir` > this default.
  */
 export function defaultDataDir(
   env: NodeJS.ProcessEnv = process.env,

@@ -9,7 +9,7 @@ import { resolveRange } from "./range.ts"
 
 export interface BuildReportInput extends RangeInput {
   project?: string
-  /** Config override arrives in Phase 5; defaults to Monday. */
+  /** Config-derived first day of the week; defaults to Monday (SPEC §7). */
   weekStart?: WeekStart
 }
 

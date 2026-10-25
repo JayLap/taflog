@@ -8,8 +8,16 @@ import type { ShowStatus } from "../../../application/status.ts"
 import type { StopTask } from "../../../application/stop-task.ts"
 import type { SwitchTask } from "../../../application/switch-task.ts"
 import { UsageError } from "../../../application/errors.ts"
+import type { WeekStart } from "../../../domain/datetime.ts"
 import { TaflogError } from "../../../domain/errors.ts"
 import type { ParsedArgs } from "./args.ts"
+import {
+  configJson,
+  CONFIG_ORDER,
+  renderConfig,
+  renderSet,
+  type ConfigView,
+} from "./present-config.ts"
 import {
   renderAdjusted,
   renderRemoved,
@@ -35,6 +43,10 @@ export interface CliDeps {
   queryLog: QueryLog
   buildReport: BuildReport
   exportLog: ExportLog
+  /** Effective configuration plus its sources; `config` renders it (SPEC §7). */
+  config: ConfigView
+  /** Validate and merge-write one config key; throws on bad input (SPEC §7). */
+  setConfig: (key: string, value: string) => Promise<{ key: string; value: string | number }>
   version: string
   stdout: (chunk: string) => void
   stderr: (chunk: string) => void
@@ -100,8 +112,13 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
 
   const env = deps.env ?? process.env
   const style = createStyle({
-    icons: resolveIcons(parsed.options.icons, env),
-    color: resolveColor(parsed.options.noColor, env, deps.isTTY === true),
+    icons: resolveIcons(parsed.options.icons, env, deps.config.icons.value),
+    color: resolveColor(
+      parsed.options.noColor,
+      env,
+      deps.isTTY === true,
+      deps.config.color.value,
+    ),
     width: deps.columns ?? Number.POSITIVE_INFINITY,
   })
 
@@ -175,7 +192,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "log": {
-        const result = await deps.queryLog.execute(rangeInput(parsed))
+        const result = await deps.queryLog.execute(rangeInput(parsed, deps.config.weekStart.value))
         warnSkipped(result.skipped, deps)
         deps.stdout(
           parsed.options.json
@@ -189,7 +206,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "report": {
-        const result = await deps.buildReport.execute(rangeInput(parsed))
+        const result = await deps.buildReport.execute(rangeInput(parsed, deps.config.weekStart.value))
         warnSkipped(result.skipped, deps)
         deps.stdout(
           parsed.options.json
@@ -200,6 +217,34 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
                 details: parsed.options.details,
               }),
         )
+        return 0
+      }
+      case "config": {
+        if (parsed.operands.length > 1) throw new UsageError("config takes at most one <key>")
+        const rawKey = parsed.operands[0]
+        if (rawKey !== undefined && !CONFIG_ORDER.includes(rawKey as keyof ConfigView)) {
+          throw new UsageError(`unknown config key: ${rawKey}`)
+        }
+        const key = rawKey as keyof ConfigView | undefined
+        deps.stdout(
+          parsed.options.json
+            ? configJson(deps.config, {
+                pretty: parsed.options.pretty,
+                ...(key === undefined ? {} : { key }),
+              })
+            : renderConfig(deps.config, {
+                style,
+                ...(key === undefined ? {} : { key }),
+              }),
+        )
+        return 0
+      }
+      case "set": {
+        const [key, value] = parsed.operands
+        if (key === undefined || value === undefined || parsed.operands.length > 2) {
+          throw new UsageError("set requires <key> <value>")
+        }
+        deps.stdout(renderSet(await deps.setConfig(key, value)))
         return 0
       }
       case "export": {
@@ -218,7 +263,10 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
   }
 }
 
-function rangeInput(parsed: ParsedArgs): {
+function rangeInput(
+  parsed: ParsedArgs,
+  weekStart: WeekStart,
+): {
   today?: boolean
   week?: boolean
   month?: boolean
@@ -226,6 +274,7 @@ function rangeInput(parsed: ParsedArgs): {
   from?: string
   to?: string
   limit?: number
+  weekStart: WeekStart
 } {
   return {
     ...(parsed.options.today ? { today: true } : {}),
@@ -235,6 +284,7 @@ function rangeInput(parsed: ParsedArgs): {
     ...(parsed.options.from === null ? {} : { from: parsed.options.from }),
     ...(parsed.options.to === null ? {} : { to: parsed.options.to }),
     ...(parsed.options.limit === null ? {} : { limit: parsed.options.limit }),
+    weekStart,
   }
 }
 

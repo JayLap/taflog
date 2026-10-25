@@ -12,7 +12,7 @@ correct the record when you forget, and read back where the hours went.
 
 ## Status
 
-🚧 **Phase 4 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
+🚧 **Phase 5 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
 `switch` manage the running Timer; `status` reports it. `add`, `sub`, and `rm`
 correct the record with dated, signed Adjustments and append-only tombstones.
 `log` and `report` read it back: `log` lists Entries and Adjustments, and
@@ -24,10 +24,12 @@ bare minutes; dates accept `YYYY-MM-DD`, `today`, `yesterday`, and weekday
 names. Persistence is append-only NDJSON with `--dir`, corrupt-line warnings,
 and `--strict`. `start` while running and `stop` while idle are refused, and a
 forgotten Timer (`maxTimerHours`, default 8) needs `--force` to close. Colour
-and glyphs follow `NO_COLOR`, `--icons`, and the terminal. The design is
-settled in [`SPEC.md`](./SPEC.md), decisions are recorded in
+and glyphs follow `NO_COLOR`, `--icons`, and the terminal. `config` and `set`
+read and write a versioned per-OS config file; every key resolves as
+`--flag` > env > config file > default, and `config` shows each value's source.
+The design is settled in [`SPEC.md`](./SPEC.md), decisions are recorded in
 [`docs/adr/`](./docs/adr), and vocabulary follows
-[`GLOSSARY.md`](./GLOSSARY.md). The next phase adds configuration.
+[`GLOSSARY.md`](./GLOSSARY.md). The next phase is polish and publish.
 
 ## Install
 

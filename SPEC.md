@@ -157,7 +157,10 @@ Precedence for every key: `--flag` > env (`TAFLOG_DIR`, `TAFLOG_ICONS`) >
 config file > default. Unknown keys and invalid values are usage errors (exit
 2). `taflog config` prints the effective values **with their source**;
 `taflog config <key>` prints one; `taflog set <key> <value>` validates and
-merge-writes.
+merge-writes. For `--json`, `taflog config` emits
+`{version:1, config:{<key>:{value, source}}}` and `taflog config <key>` emits
+`{version:1, key, value, source}`; a source is one of `flag`, `env`, `file`,
+`default`.
 
 ## 8. CLI
 

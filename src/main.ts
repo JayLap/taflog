@@ -4,11 +4,17 @@ import type { ParsedArgs } from "./adapters/in/cli/args.ts"
 import { parseArgs } from "./adapters/in/cli/args.ts"
 import { runCli } from "./adapters/in/cli/run.ts"
 import { SystemClock } from "./adapters/out/clock/system-clock.ts"
+import {
+  JsonConfigStore,
+  resolveConfig,
+  setConfigValue,
+  type PartialConfig,
+} from "./adapters/out/config/config.ts"
+import { resolveConfigPath } from "./adapters/out/config/paths.ts"
 import { JsonlEventLog } from "./adapters/out/store/jsonl-event-log.ts"
-import { defaultDataDir } from "./adapters/out/store/paths.ts"
-import { UsageError } from "./application/errors.ts"
 import { AddAdjustment, SubAdjustment } from "./application/adjustment.ts"
 import { BuildReport } from "./application/build-report.ts"
+import { UsageError } from "./application/errors.ts"
 import { ExportLog } from "./application/export-log.ts"
 import { QueryLog } from "./application/query-log.ts"
 import { RemoveEntry } from "./application/remove-entry.ts"
@@ -16,11 +22,14 @@ import { StartTask } from "./application/start-task.ts"
 import { ShowStatus } from "./application/status.ts"
 import { StopTask } from "./application/stop-task.ts"
 import { SwitchTask } from "./application/switch-task.ts"
+import { newId } from "./domain/identity.ts"
+import { TaflogError } from "./domain/errors.ts"
 import { version } from "./version.ts"
 
 /**
  * Composition root (SPEC §3, ADR-0005): the only module that imports both the
- * driving adapter and the driven adapters, and wires them by hand.
+ * driving adapter and the driven adapters, and wires them by hand. It also
+ * resolves configuration before constructing anything that depends on it.
  */
 async function main(): Promise<void> {
   let parsed: ParsedArgs
@@ -33,14 +42,42 @@ async function main(): Promise<void> {
     process.exit(2)
   }
 
-  const dir = parsed.options.dir ?? process.env.TAFLOG_DIR ?? defaultDataDir()
+  const env = process.env
+  const store = new JsonConfigStore(resolveConfigPath(env))
+
+  // `--help`/`--version` must work even when the config file is unusable.
+  const wantsHelp = parsed.options.help || parsed.options.version || parsed.command === "help"
+  let file: PartialConfig = {}
+  if (!wantsHelp) {
+    try {
+      file = await store.read()
+    } catch (error) {
+      fail(error)
+    }
+  }
+
+  const config = resolveConfig({
+    file,
+    flags: {
+      dir: parsed.options.dir,
+      weekStart: null,
+      maxTimerHours: null,
+      color: parsed.options.noColor ? "never" : null,
+      icons: parsed.options.icons,
+    },
+    env,
+  })
+
   const clock = new SystemClock()
-  const log = new JsonlEventLog(join(dir, "events.ndjson"), { strict: parsed.options.strict })
+  const log = new JsonlEventLog(join(config.dir.value, "events.ndjson"), {
+    strict: parsed.options.strict,
+  })
+  const maxTimerHours = config.maxTimerHours.value
 
   const code = await runCli(parsed, {
     startTask: new StartTask(clock, log),
-    stopTask: new StopTask(clock, log),
-    switchTask: new SwitchTask(clock, log),
+    stopTask: new StopTask(clock, log, newId, maxTimerHours),
+    switchTask: new SwitchTask(clock, log, newId, maxTimerHours),
     showStatus: new ShowStatus(clock, log),
     addAdjustment: new AddAdjustment(clock, log),
     subAdjustment: new SubAdjustment(clock, log),
@@ -48,14 +85,25 @@ async function main(): Promise<void> {
     queryLog: new QueryLog(clock, log),
     buildReport: new BuildReport(clock, log),
     exportLog: new ExportLog(log),
+    config,
+    setConfig: (key, value) => setConfigValue(store, key, value),
     version: version(),
     stdout: (chunk) => process.stdout.write(chunk),
     stderr: (chunk) => process.stderr.write(chunk),
-    env: process.env,
+    env,
     isTTY: process.stdout.isTTY === true,
     columns: process.stdout.columns,
   })
   process.exit(code)
+}
+
+/** Print a known `TaflogError` with its exit code; rethrow anything else. */
+function fail(error: unknown): never {
+  if (error instanceof TaflogError) {
+    process.stderr.write(`taflog: ${error.message}\n`)
+    process.exit(error.exitCode)
+  }
+  throw error
 }
 
 main().catch((error: unknown) => {

@@ -1,5 +1,5 @@
 import type { Entry } from "../domain/entry.ts"
-import { overlapSeconds } from "../domain/datetime.ts"
+import { overlapSeconds, type WeekStart } from "../domain/datetime.ts"
 import { reduceEvents } from "../domain/reduce.ts"
 import type { PeriodTotals } from "../domain/summary.ts"
 import { summarizeRange } from "../domain/summary.ts"
@@ -32,6 +32,8 @@ export type LogItem =
 export interface LogQueryInput extends RangeInput {
   project?: string
   limit?: number
+  /** Config-derived first day of the week; defaults to Monday (SPEC §7). */
+  weekStart?: WeekStart
 }
 
 export interface QueryLogResult {
@@ -65,7 +67,7 @@ export class QueryLog {
 
     const { events, skipped } = await this.log.readAll()
     const now = this.clock.now()
-    const range = resolveRange(input, now, "monday", "today")
+    const range = resolveRange(input, now, input.weekStart ?? "monday", "today")
     const state = reduceEvents(events)
     const project = normalizeProject(input.project)
 
