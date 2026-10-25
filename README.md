@@ -110,6 +110,24 @@ $ npm start -- --help
 Contributors who want the no-build loop (`node src/main.ts`) need Node `>= 24`;
 the published package supports Node `>= 20`.
 
+## Releasing
+
+Releases are published from CI by `.github/workflows/release.yml`. Bump
+`version` in `package.json`, then push a matching tag:
+
+```console
+$ git tag v0.1.0
+$ git push origin v0.1.0
+```
+
+The workflow checks that the tag matches `package.json`, runs `npm test` (also
+gated locally by `prepublishOnly`), and publishes with a signed provenance
+statement. Add an `NPM_TOKEN` repository secret (automation token with publish
+rights) for authentication; once the package exists you can switch to
+[npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements)
+and drop the token. `npm publish --dry-run` reproduces the release locally
+without uploading.
+
 ## License
 
 [MIT](./LICENSE)

@@ -20,6 +20,11 @@ const root = fileURLToPath(new URL("../..", import.meta.url))
  * the platform launcher.
  */
 function npmRun(args: string[], cwd = root): string {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  // A parent `npm publish --dry-run` exports `npm_config_dry_run`; a nested
+  // `npm pack` would inherit it and skip writing the tarball. Drop it so this
+  // smoke test always exercises a real pack.
+  delete env.npm_config_dry_run
   const npmCli = process.env.npm_execpath
   const command = npmCli === undefined ? (process.platform === "win32" ? "npm.cmd" : "npm") : process.execPath
   const argv = npmCli === undefined ? args : [npmCli, ...args]
@@ -27,7 +32,7 @@ function npmRun(args: string[], cwd = root): string {
     cwd,
     encoding: "utf8",
     shell: npmCli === undefined && process.platform === "win32",
-    env: process.env,
+    env,
   })
   if (result.status !== 0) {
     throw new Error(`npm ${args.join(" ")} failed (${result.status}):\n${result.stderr}`)

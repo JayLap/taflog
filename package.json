@@ -15,7 +15,8 @@
     "start": "node src/main.ts",
     "pretest": "npm run build",
     "test": "node --test",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=20"
@@ -35,12 +36,15 @@
   "author": "Jérémie Lapointe",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jelap/taflog.git"
+    "url": "git+https://github.com/JayLap/taflog.git"
   },
   "bugs": {
-    "url": "https://github.com/jelap/taflog/issues"
+    "url": "https://github.com/JayLap/taflog/issues"
   },
-  "homepage": "https://github.com/jelap/taflog#readme",
+  "homepage": "https://github.com/JayLap/taflog#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^7.0.2"

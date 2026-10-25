@@ -1,0 +1,61 @@
+name: Release
+
+# Publishes to npm when a `v*` tag is pushed. The tag must match the
+# `version` in package.json (checked below). `npm publish` runs the
+# `prepublishOnly` gate, which runs the full test suite.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# `id-token: write` lets npm generate a signed provenance statement.
+permissions:
+  contents: read
+  id-token: write
+
+# Never let two releases race for the same version.
+concurrency:
+  group: npm-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p 'require("./package.json").version')"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+
+      # `prepublishOnly: npm test` also runs on publish; this step makes the
+      # failure visible before the upload and keeps the workflow readable.
+      - name: Test
+        run: npm test
+
+      # Provenance uses the GitHub OIDC token; NPM_TOKEN authenticates the
+      # upload. After the first release you can switch to npm trusted
+      # publishing and drop the token.
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
