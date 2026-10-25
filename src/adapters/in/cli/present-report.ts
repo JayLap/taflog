@@ -5,7 +5,6 @@ import {
   formatShortWeekday,
   isWeekend,
 } from "../../../domain/datetime.ts"
-import { formatDuration } from "../../../domain/duration.ts"
 import { rangeTitle } from "./range-title.ts"
 import { createStyle, type Style } from "./style.ts"
 
@@ -42,11 +41,11 @@ export function renderReport(result: BuildReportResult, options: ReportRenderOpt
 
 function renderSummary(projects: ReportProject[], style: Style): string[] {
   const projectWidth = Math.max(...projects.map((project) => project.project.length))
-  const totalWidth = Math.max(...projects.map((project) => formatDuration(project.totalSeconds).length))
-  const timedWidth = Math.max(...projects.map((project) => formatDuration(project.timedSeconds).length))
+  const totalWidth = Math.max(...projects.map((project) => style.duration(project.totalSeconds).length))
+  const timedWidth = Math.max(...projects.map((project) => style.duration(project.timedSeconds).length))
 
   return projects.map((project) => {
-    let line = `  ${project.project.padEnd(projectWidth)}   ${formatDuration(project.totalSeconds).padStart(totalWidth)}    timed ${formatDuration(project.timedSeconds).padStart(timedWidth)}`
+    let line = `  ${project.project.padEnd(projectWidth)}   ${style.duration(project.totalSeconds).padStart(totalWidth)}    timed ${style.duration(project.timedSeconds).padStart(timedWidth)}`
     if (project.adjustedSeconds !== 0) {
       line += ` ${style.glyphs.project} adjusted ${style.signed(project.adjustedSeconds)}`
     }
@@ -73,9 +72,9 @@ function renderGrid(
   for (const project of report.byProject) {
     grandTotal += project.totalSeconds
     const cells = columns
-      .map((column) => pad(gridDuration(dayProjectTotal(column.day, project.project))))
+      .map((column) => pad(gridDuration(dayProjectTotal(column.day, project.project), style)))
       .join("")
-    const row = `${label(`  ${project.project}`)}${cells}${pad(gridDuration(project.totalSeconds))}`.trimEnd()
+    const row = `${label(`  ${project.project}`)}${cells}${pad(gridDuration(project.totalSeconds, style))}`.trimEnd()
     lines.push(row.replace(project.project, style.project(project.project)))
 
     if (details) {
@@ -83,11 +82,11 @@ function renderGrid(
         const cells = columns
           .map((column) => {
             const timed = detail.byDay.find((item) => item.date === column.date)?.timedSeconds ?? 0
-            return timed === 0 ? " ".repeat(cellWidth) : pad(gridDuration(timed))
+            return timed === 0 ? " ".repeat(cellWidth) : pad(gridDuration(timed, style))
           })
           .join("")
         lines.push(
-          `${label(`    ${detail.description}`)}${cells}${pad(gridDuration(detail.totalSeconds))}`.trimEnd(),
+          `${label(`    ${detail.description}`)}${cells}${pad(gridDuration(detail.totalSeconds, style))}`.trimEnd(),
         )
       }
 
@@ -111,9 +110,9 @@ function renderGrid(
   )
 
   const totals = columns
-    .map((column) => pad(gridDuration(column.day?.totalSeconds ?? 0)))
+    .map((column) => pad(gridDuration(column.day?.totalSeconds ?? 0, style)))
     .join("")
-  lines.push(`${label("  Total")}${totals}${pad(gridDuration(grandTotal))}`.trimEnd())
+  lines.push(`${label("  Total")}${totals}${pad(gridDuration(grandTotal, style))}`.trimEnd())
 
   return lines
 }
@@ -160,8 +159,8 @@ function dayProjectTotal(day: ReportDay | undefined, project: string): number {
 }
 
 /** Grid durations always show hours, without a trailing `m` (`0h30`, `2h00`). */
-function gridDuration(seconds: number): string {
-  const sign = seconds < 0 ? "−" : ""
+function gridDuration(seconds: number, style: Style): string {
+  const sign = seconds < 0 ? style.glyphs.sub : ""
   const totalMinutes = Math.floor(Math.abs(seconds) / 60)
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60

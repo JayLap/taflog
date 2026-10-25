@@ -425,3 +425,33 @@ test("invalid read filters are usage errors", () => {
     assert.equal(run(dir, ["report", "--from", "nope"]).status, 2)
   })
 })
+
+test("exit codes follow SPEC §8.4 and errors are prefixed", () => {
+  withTempDir((dir) => {
+    const usage: string[][] = [
+      ["frobnicate"],
+      ["status", "--nope"],
+      ["start"],
+      ["switch"],
+      ["add", "acme", "nope"],
+      ["add", "acme"],
+      ["rm", "one", "two"],
+      ["config", "nope"],
+      ["config", "dir", "extra"],
+      ["set", "color", "rainbow"],
+      ["set", "nope", "1"],
+    ]
+    for (const args of usage) {
+      const result = run(dir, args)
+      assert.equal(result.status, 2, `${args.join(" ")} -> status ${result.status}`)
+      assert.match(result.stderr, /^taflog: /, `${args.join(" ")} -> ${JSON.stringify(result.stderr)}`)
+    }
+
+    const runtime: string[][] = [["stop"], ["rm", "zzzzzzzz"]]
+    for (const args of runtime) {
+      const result = run(dir, args)
+      assert.equal(result.status, 1, `${args.join(" ")} -> status ${result.status}`)
+      assert.match(result.stderr, /^taflog: /)
+    }
+  })
+})

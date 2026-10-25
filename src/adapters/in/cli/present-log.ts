@@ -1,6 +1,5 @@
 import type { LogItem, QueryLogResult } from "../../../application/query-log.ts"
 import { formatLocalTime } from "../../../domain/datetime.ts"
-import { formatDuration } from "../../../domain/duration.ts"
 import { rangeTitle } from "./range-title.ts"
 import { createStyle, type Style } from "./style.ts"
 
@@ -47,6 +46,7 @@ function renderItem(
       ? `  ${`${formatLocalTime(item.start)} → ${formatLocalTime(item.end)}`.padEnd(16)}${duration(
           item,
           options,
+          style,
         ).padStart(4)}`
       : `${" ".repeat(19)}${style.signed(item.deltaSeconds)}`
 
@@ -66,13 +66,13 @@ function describe(item: LogItem, style: Style): string {
   return `adjustment${note}`
 }
 
-function duration(item: LogItem, options: LogRenderOptions): string {
+function duration(item: LogItem, options: LogRenderOptions, style: Style): string {
   if (item.kind !== "timed") return ""
   if (options.seconds === true) {
     const seconds = item.durationSeconds % 60
-    return `${formatDuration(item.durationSeconds)}${String(seconds).padStart(2, "0")}s`
+    return `${style.duration(item.durationSeconds)}${String(seconds).padStart(2, "0")}s`
   }
-  return formatDuration(item.durationSeconds)
+  return style.duration(item.durationSeconds)
 }
 
 /** JSON presenter for `log`; frozen `version: 1`, seconds only (SPEC §9.5). */

@@ -5,7 +5,6 @@ import type { SwitchResult } from "../../../application/switch-task.ts"
 import type { AdjustmentResult } from "../../../application/adjustment.ts"
 import type { RemoveResult } from "../../../application/remove-entry.ts"
 import { formatLocalTime } from "../../../domain/datetime.ts"
-import { formatDuration } from "../../../domain/duration.ts"
 import { createStyle, type Style } from "./style.ts"
 
 /** Terminal presenter for `status` (SPEC §9.1). Always ends with a newline. */
@@ -19,7 +18,7 @@ export function renderStatus(result: StatusResult, style: Style = createStyle())
         : ` — ${style.meta(result.timer.description)}`
     const header = `${style.running(style.glyphs.running)} ${project}${description}`
     const summary = style.meta(
-      `  running ${formatDuration(elapsed)} (since ${formatLocalTime(result.timer.start)}) ${style.glyphs.project} today ${formatDuration(result.today.totalSeconds)}`,
+      `  running ${style.duration(elapsed)} (since ${formatLocalTime(result.timer.start)}) ${style.glyphs.project} today ${style.duration(result.today.totalSeconds)}`,
     )
     return `${style.truncate(header, style.width)}\n${style.truncate(summary, style.width)}\n`
   }
@@ -28,7 +27,7 @@ export function renderStatus(result: StatusResult, style: Style = createStyle())
     const duration = elapsedSeconds(result.lastEntry.start, result.lastEntry.end)
     return `${style.truncate(
       style.meta(
-        `${style.glyphs.idle} idle ${style.glyphs.project} last ${style.project(result.lastEntry.project)} ${formatDuration(duration)} (ended ${formatLocalTime(result.lastEntry.end)}) ${style.glyphs.project} today ${formatDuration(result.today.totalSeconds)}`,
+        `${style.glyphs.idle} idle ${style.glyphs.project} last ${style.project(result.lastEntry.project)} ${style.duration(duration)} (ended ${formatLocalTime(result.lastEntry.end)}) ${style.glyphs.project} today ${style.duration(result.today.totalSeconds)}`,
       ),
       style.width,
     )}\n`
@@ -36,7 +35,7 @@ export function renderStatus(result: StatusResult, style: Style = createStyle())
 
   return `${style.truncate(
     style.meta(
-      `${style.glyphs.idle} idle ${style.glyphs.project} today ${formatDuration(result.today.totalSeconds)}`,
+      `${style.glyphs.idle} idle ${style.glyphs.project} today ${style.duration(result.today.totalSeconds)}`,
     ),
     style.width,
   )}\n`
@@ -65,7 +64,7 @@ export function renderStarted(result: StartResult, style: Style = createStyle())
 /** Confirmation for `stop`. */
 export function renderStopped(result: StopResult, style: Style = createStyle()): string {
   const duration = elapsedSeconds(result.entry.start, result.entry.end)
-  return `${style.glyphs.idle} stopped ${style.project(result.entry.project)} ${style.glyphs.project} ${formatDuration(duration)}\n`
+  return `${style.glyphs.idle} stopped ${style.project(result.entry.project)} ${style.glyphs.project} ${style.duration(duration)}\n`
 }
 
 /** Confirmation for `switch` (SPEC §10). */
@@ -75,7 +74,7 @@ export function renderSwitched(result: SwitchResult, style: Style = createStyle(
     return `${started}\n`
   }
   const duration = elapsedSeconds(result.closed.start, result.closed.end)
-  return `${style.glyphs.idle} ${style.project(result.closed.project)} ${formatDuration(duration)} → ${started}\n`
+  return `${style.glyphs.idle} ${style.project(result.closed.project)} ${style.duration(duration)} → ${started}\n`
 }
 
 function elapsedSeconds(start: Date, end: Date): number {
@@ -94,7 +93,7 @@ export function renderRemoved(result: RemoveResult, style: Style = createStyle()
   if (result.removed.kind === "entry") {
     const removed = result.removed.entry
     const duration = elapsedSeconds(removed.start, removed.end)
-    return `${style.glyphs.idle} removed ${style.project(removed.project)} ${formatDuration(duration)}\n`
+    return `${style.glyphs.idle} removed ${style.project(removed.project)} ${style.duration(duration)}\n`
   }
   const removed = result.removed.adjustment
   return `${style.glyphs.idle} removed adjustment ${style.signed(removed.delta)} ${style.project(removed.project)}\n`

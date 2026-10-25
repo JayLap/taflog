@@ -68,6 +68,8 @@ export interface Style {
   sub(text: string): string
   /** `+50m` / `−30m`, following the glyph profile. */
   signed(deltaSeconds: number): string
+  /** A duration whose negative sign follows the glyph profile (`-30m` in ascii). */
+  duration(seconds: number): string
   truncate(text: string, max: number): string
 }
 
@@ -104,6 +106,8 @@ export function createStyle(options: StyleOptions = {}): Style {
       const sign = deltaSeconds < 0 ? glyphs.sub : glyphs.add
       return `${sign}${formatDuration(Math.abs(deltaSeconds))}`
     },
+    duration: (seconds) =>
+      seconds < 0 ? `${glyphs.sub}${formatDuration(Math.abs(seconds))}` : formatDuration(seconds),
     truncate: (text, max) => truncate(text, max),
   }
 }

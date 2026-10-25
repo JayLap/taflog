@@ -34,7 +34,7 @@ test("--help prints usage", () => {
 test("--version prints the package version", () => {
   const { stdout, status } = run("--version")
   assert.equal(status, 0)
-  assert.match(stdout.trim(), /^\d+\.\d+\.\d+/)
+  assert.equal(stdout.trim(), "0.1.0")
 })
 
 test("an unknown command is a usage error", () => {

@@ -31,7 +31,7 @@ import { version } from "./version.ts"
  * driving adapter and the driven adapters, and wires them by hand. It also
  * resolves configuration before constructing anything that depends on it.
  */
-async function main(): Promise<void> {
+async function main(): Promise<number> {
   let parsed: ParsedArgs
   try {
     parsed = parseArgs(process.argv.slice(2))
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     const message = error instanceof UsageError ? error.message : "invalid arguments"
     process.stderr.write(`taflog: ${message}\n`)
     process.stderr.write("Run `taflog --help` for usage.\n")
-    process.exit(2)
+    return 2
   }
 
   const env = process.env
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     try {
       file = await store.read()
     } catch (error) {
-      fail(error)
+      return fail(error)
     }
   }
 
@@ -94,20 +94,27 @@ async function main(): Promise<void> {
     isTTY: process.stdout.isTTY === true,
     columns: process.stdout.columns,
   })
-  process.exit(code)
+  return code
 }
 
-/** Print a known `TaflogError` with its exit code; rethrow anything else. */
-function fail(error: unknown): never {
+/** Print a known `TaflogError` and return its exit code; rethrow anything else. */
+function fail(error: unknown): number {
   if (error instanceof TaflogError) {
     process.stderr.write(`taflog: ${error.message}\n`)
-    process.exit(error.exitCode)
+    return error.exitCode
   }
   throw error
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error)
-  process.stderr.write(`taflog: ${message}\n`)
-  process.exit(1)
-})
+main().then(
+  (code) => {
+    // Assigning `exitCode` lets pending stdout drain, so `export` never
+    // truncates a pipe (unlike `process.exit`).
+    process.exitCode = code
+  },
+  (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    process.stderr.write(`taflog: ${message}\n`)
+    process.exitCode = 1
+  },
+)

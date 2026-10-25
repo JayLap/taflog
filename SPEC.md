@@ -135,7 +135,8 @@ shows them; `rm` accepts a full id or an unambiguous prefix.
 - **Midnight-spanning Entry**: one Entry in `log`; a Report splits its duration
   across the local days it crosses.
 - **Rounding**: none is stored. Durations render to the minute (`2h05m`);
-  seconds appear only in `--json` (which is always seconds) or with `--seconds`.
+  seconds appear only in `--json` (which is always seconds) or with `--seconds`
+  on `log`.
 - **Forgotten Timer**: an open Entry older than `maxTimerHours` (default `8`)
   is reported by `status`; `stop`/`switch` refuse to close it unless `--force`.
 
@@ -184,9 +185,12 @@ merge-writes. For `--json`, `taflog config` emits
 
 ### 8.2 Global flags
 
-`--dir <path>`, `--json`, `--no-color`, `--icons auto|nerd|ascii`,
-`--strict`, `-h/--help`, `-V/--version`. `--json` works on every read command
-in either position (`taflog --json status`, `taflog status --json`).
+`--dir <path>`, `--json`, `--pretty`, `--no-color`,
+`--icons auto|nerd|ascii`, `--seconds`, `--strict`, `--force`, `-h/--help`,
+`-V/--version`. `--json` works on every read command in either position
+(`taflog --json status`, `taflog status --json`); `--pretty` indents it.
+`--seconds` shows seconds on `log` durations; `--force` closes a forgotten
+Timer (SPEC §6, §10).
 
 ### 8.3 Filters
 

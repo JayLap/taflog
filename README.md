@@ -12,28 +12,28 @@ correct the record when you forget, and read back where the hours went.
 
 ## Status
 
-🚧 **Phase 5 of [`PLAN.md`](./PLAN.md) is implemented.** `start`, `stop`, and
-`switch` manage the running Timer; `status` reports it. `add`, `sub`, and `rm`
-correct the record with dated, signed Adjustments and append-only tombstones.
-`log` and `report` read it back: `log` lists Entries and Adjustments, and
-`report` summarizes by Project or by day (`--by day`, `--details`), with
-`--today`, `--week`, `--month`, `--project`, and `--from`/`--to` filters.
-`--json` has a frozen `version: 1` shape, `--ids` shows identities, and `export`
-dumps the raw Log byte-for-byte. Durations parse `90m`, `1h30m`, `1.5h`, and
-bare minutes; dates accept `YYYY-MM-DD`, `today`, `yesterday`, and weekday
-names. Persistence is append-only NDJSON with `--dir`, corrupt-line warnings,
-and `--strict`. `start` while running and `stop` while idle are refused, and a
-forgotten Timer (`maxTimerHours`, default 8) needs `--force` to close. Colour
-and glyphs follow `NO_COLOR`, `--icons`, and the terminal. `config` and `set`
-read and write a versioned per-OS config file; every key resolves as
-`--flag` > env > config file > default, and `config` shows each value's source.
+**v0.1.0 — feature complete.** `start`, `stop`, and `switch` manage the running
+Timer; `status` reports it. `add`, `sub`, and `rm` correct the record with
+dated, signed Adjustments and append-only tombstones. `log` and `report` read
+it back: `log` lists Entries and Adjustments, and `report` summarizes by Project
+or by day (`--by day`, `--details`), with `--today`, `--week`, `--month`,
+`--project`, and `--from`/`--to` filters. `--json` has a frozen `version: 1`
+shape, `--ids` shows identities, and `export` dumps the raw Log byte-for-byte.
+Durations parse `90m`, `1h30m`, `1.5h`, and bare minutes; dates accept
+`YYYY-MM-DD`, `today`, `yesterday`, and weekday names. Persistence is
+append-only NDJSON with `--dir`, corrupt-line warnings, and `--strict`. `start`
+while running and `stop` while idle are refused, and a forgotten Timer
+(`maxTimerHours`, default 8) needs `--force` to close. Colour and glyphs follow
+`NO_COLOR`, `--icons`, and the terminal. `config` and `set` read and write a
+versioned per-OS config file; every key resolves as `--flag` > env > config file
+> default, and `config` shows each value's source.
+
 The design is settled in [`SPEC.md`](./SPEC.md), decisions are recorded in
-[`docs/adr/`](./docs/adr), and vocabulary follows
-[`GLOSSARY.md`](./GLOSSARY.md). The next phase is polish and publish.
+[`docs/adr/`](./docs/adr), vocabulary follows [`GLOSSARY.md`](./GLOSSARY.md),
+and [`PLAN.md`](./PLAN.md) tracks the build. `npm test` includes a
+`npm pack` → `npm install -g` smoke test that runs the installed CLI.
 
 ## Install
-
-Planned for the first release:
 
 ```console
 $ npm install -g taflog
@@ -56,6 +56,7 @@ $ taflog rm [<id>]                      # remove an entry or adjustment
 $ taflog config [<key>]                 # show effective configuration
 $ taflog set <key> <value>              # change a preference
 $ taflog export                         # raw event log for other tools
+$ taflog help                           # usage and version
 ```
 
 A session might look like:

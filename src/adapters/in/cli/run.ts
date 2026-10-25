@@ -71,6 +71,7 @@ Usage:
   taflog config [<key>]
   taflog set <key> <value>
   taflog export
+  taflog help
 
 Filters:
   --today, --week, --month    preset window (log defaults to today; report to this week)
@@ -80,7 +81,7 @@ Filters:
   --by <project|day>          report grouping
   --details                   add Description sub-rows to the report grid
   --ids                       show Entry/Adjustment identities (log)
-  --seconds                   show seconds alongside rendered durations
+  --seconds                   show seconds on log durations
 
 Global flags:
   --dir <path>              data directory

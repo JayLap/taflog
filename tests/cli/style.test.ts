@@ -30,6 +30,13 @@ test("ascii and nerd profiles swap every glyph", () => {
   assert.equal(nerd.glyphs.project, "󰉋")
 })
 
+test("negative durations use the profile's minus glyph", () => {
+  assert.equal(createStyle().duration(-1800), "−30m")
+  assert.equal(createStyle({ icons: "ascii" }).duration(-1800), "-30m")
+  assert.equal(createStyle({ icons: "nerd" }).duration(-1800), "󰍴30m")
+  assert.equal(createStyle({ icons: "ascii" }).duration(1800), "30m")
+})
+
 test("colour wraps text only when enabled", () => {
   assert.doesNotMatch(createStyle().project("acme"), /\u001b\[/)
   assert.match(createStyle({ color: true }).project("acme"), /^\u001b\[36macme\u001b\[0m$/)

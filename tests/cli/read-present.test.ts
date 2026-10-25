@@ -289,3 +289,15 @@ test("report uses a one-line empty state", () => {
   empty.report.byDay = []
   assert.match(renderReport(empty, { style: createStyle() }), /No time tracked/)
 })
+
+test("ascii icons keep negative report durations ASCII", () => {
+  const grid = renderReport(reportResult(), { style: createStyle({ icons: "ascii" }), grid: true })
+  assert.doesNotMatch(grid, /−/)
+  assert.match(grid, /-0h30/)
+
+  const negative = reportResult()
+  negative.report.byProject[0]!.totalSeconds = -1800
+  const summary = renderReport(negative, { style: createStyle({ icons: "ascii" }) })
+  assert.doesNotMatch(summary, /−/)
+  assert.match(summary, /-30m/)
+})

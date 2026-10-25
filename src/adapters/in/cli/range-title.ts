@@ -6,7 +6,6 @@ import {
   formatShortWeekday,
   isoWeekNumber,
 } from "../../../domain/datetime.ts"
-import { formatDuration } from "../../../domain/duration.ts"
 import type { Style } from "./style.ts"
 
 const LONG_MONTHS = [
@@ -44,7 +43,7 @@ export function rangeTitle(
     title = customTitle(range, style)
   }
   if (totalSeconds !== undefined) {
-    title += ` ${style.glyphs.date} ${formatDuration(totalSeconds)}`
+    title += ` ${style.glyphs.date} ${style.duration(totalSeconds)}`
   }
   return title
 }
