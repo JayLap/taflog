@@ -51,7 +51,7 @@ test("the packed tarball installs globally and the installed CLI runs", { timeou
 
     const packed = JSON.parse(
       npmRun(["pack", "--json", "--ignore-scripts", "--pack-destination", packDir]),
-    ) as Array<{ filename: string; version: string; files: Array<{ path: string }> }>
+    ) as Array<{ name: string; filename: string; version: string; files: Array<{ path: string }> }>
     const info = packed[0]!
     assert.equal(info.version, "0.1.0")
 
@@ -67,9 +67,11 @@ test("the packed tarball installs globally and the installed CLI runs", { timeou
     npmRun(["install", "-g", tarball, "--ignore-scripts", "--prefix", prefix])
 
     // Global layout differs by OS: `<prefix>/lib/node_modules` on POSIX,
-    // `<prefix>/node_modules` on Windows. Ask npm instead of assuming.
+    // `<prefix>/node_modules` on Windows. Ask npm instead of assuming. A
+    // scoped name installs under the scope directory, so derive it from the
+    // packed name (`@jaylap/taflog` -> `@jaylap/taflog`).
     const globalRoot = npmRun(["root", "-g", "--prefix", prefix]).trim()
-    const installed = join(globalRoot, "taflog", "dist", "main.js")
+    const installed = join(globalRoot, ...info.name.split("/"), "dist", "main.js")
     assert.ok(existsSync(installed), `global install places dist/main.js under ${globalRoot}`)
 
     const binCandidates =
