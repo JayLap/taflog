@@ -69,7 +69,7 @@ test("the packed tarball installs globally and the installed CLI runs", { timeou
     // Global layout differs by OS: `<prefix>/lib/node_modules` on POSIX,
     // `<prefix>/node_modules` on Windows. Ask npm instead of assuming. A
     // scoped name installs under the scope directory, so derive it from the
-    // packed name (`@jaylap/taflog` -> `@jaylap/taflog`).
+    // packed name (`@jlap/taflog` -> `@jlap/taflog`).
     const globalRoot = npmRun(["root", "-g", "--prefix", prefix]).trim()
     const installed = join(globalRoot, ...info.name.split("/"), "dist", "main.js")
     assert.ok(existsSync(installed), `global install places dist/main.js under ${globalRoot}`)

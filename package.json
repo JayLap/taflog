@@ -1,5 +1,5 @@
 {
-  "name": "@jaylap/taflog",
+  "name": "@jlap/taflog",
   "version": "0.1.0",
   "description": "Minimalist CLI time tracker for your job. \"Taf\" is French slang for work.",
   "type": "module",

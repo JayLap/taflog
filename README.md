@@ -36,7 +36,7 @@ and [`PLAN.md`](./PLAN.md) tracks the build. `npm test` includes a
 ## Install
 
 ```console
-$ npm install -g @jaylap/taflog
+$ npm install -g @jlap/taflog
 ```
 
 The package is scoped but the executable is still `taflog`. Requires Node.js
@@ -122,9 +122,9 @@ $ git push origin v0.1.0
 ```
 
 The workflow checks that the tag matches `package.json`, runs `npm test` (also
-gated locally by `prepublishOnly`), and publishes `@jaylap/taflog` with a signed
+gated locally by `prepublishOnly`), and publishes `@jlap/taflog` with a signed
 provenance statement. Add an `NPM_TOKEN` repository secret (a granular token
-with read/write access to the `@jaylap` scope) for authentication; once the
+with read/write access to the `@jlap` scope) for authentication; once the
 package exists you can switch to
 [npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements)
 and drop the token. `npm publish --dry-run` reproduces the release locally
