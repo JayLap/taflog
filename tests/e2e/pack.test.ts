@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -66,11 +66,19 @@ test("the packed tarball installs globally and the installed CLI runs", { timeou
 
     npmRun(["install", "-g", tarball, "--ignore-scripts", "--prefix", prefix])
 
-    const installed = join(prefix, "node_modules", "taflog", "dist", "main.js")
-    assert.ok(existsSync(installed), "global install places dist/main.js under the prefix")
+    // Global layout differs by OS: `<prefix>/lib/node_modules` on POSIX,
+    // `<prefix>/node_modules` on Windows. Ask npm instead of assuming.
+    const globalRoot = npmRun(["root", "-g", "--prefix", prefix]).trim()
+    const installed = join(globalRoot, "taflog", "dist", "main.js")
+    assert.ok(existsSync(installed), `global install places dist/main.js under ${globalRoot}`)
+
+    const binCandidates =
+      process.platform === "win32"
+        ? [join(prefix, "taflog.cmd"), join(prefix, "taflog")]
+        : [join(prefix, "bin", "taflog")]
     assert.ok(
-      readdirSync(prefix).some((entry) => entry.startsWith("taflog")),
-      "global install creates a bin shim in the prefix",
+      binCandidates.some((candidate) => existsSync(candidate)),
+      `global install creates a bin shim (${binCandidates.join(" or ")})`,
     )
 
     const run = (args: string[]) =>
