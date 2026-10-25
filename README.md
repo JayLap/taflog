@@ -118,11 +118,12 @@ the published package supports Node `>= 20`.
 
 ## Releasing
 
-Releases are published from CI by
-[`.github/workflows/release.yml`](./.github/workflows/release.yml). Bump
+Releases are built and staged from CI by
+[`.github/workflows/release.yml`](./.github/workflows/release.yml) using
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers). Bump
 `version` in `package.json`, push a matching tag, and the workflow runs the
-tests and publishes `@jlap/taflog` with a signed provenance statement. The
-full checklist is in [`docs/RELEASING.md`](./docs/RELEASING.md).
+tests and stages `@jlap/taflog`; a maintainer approves it with 2FA before it
+goes live. The full checklist is in [`docs/RELEASING.md`](./docs/RELEASING.md).
 
 ## Documentation
 

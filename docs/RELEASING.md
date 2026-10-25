@@ -1,32 +1,59 @@
 # Releasing taflog
 
-Releases are published from CI by
-[`.github/workflows/release.yml`](../.github/workflows/release.yml).
+Releases use [npm trusted publishing](https://docs.npmjs.com/trusted-publishers)
+(OIDC) from GitHub Actions, with [staged
+publishing](https://docs.npmjs.com/staged-publishing): CI stages the package
+and a maintainer approves it with 2FA before it goes live. No long-lived npm
+token is involved.
+
+## One-time setup
+
+On npm, under the package's **Settings → Trusted publishing**, add a GitHub
+Actions publisher:
+
+- **Organization or user:** `JayLap`
+- **Repository:** `taflog`
+- **Workflow filename:** `release.yml`
+- **Allowed actions:** leave `npm publish` (and `npm dist-tag`) unchecked, so
+  the publisher is **stage-only**. `npm stage publish` is always allowed.
+
+Then, under **Settings → Publishing access**, choose *"Require two-factor
+authentication and disallow tokens"* for the strongest posture. This does not
+affect trusted publishers, which use OIDC.
+
+No `NPM_TOKEN` repository secret is required.
 
 ## Cut a release
 
-1. Bump `version` in `package.json`.
-2. Commit the bump and push it to `main`.
-3. Push a matching tag:
+1. Bump `version` in `package.json`; commit and push to `main`.
+2. Push a matching tag:
 
    ```console
    $ git tag v0.1.0
    $ git push origin v0.1.0
    ```
 
-The workflow checks that the tag matches `package.json`, runs `npm test`, and
-publishes `@jlap/taflog` with a signed provenance statement. `npm test` is also
-gated locally by `prepublishOnly`, so a broken build cannot publish.
+3. The workflow verifies the tag against `package.json`, runs `npm test`, and
+   runs `npm stage publish`. Provenance is generated automatically.
+4. Review and approve the staged package:
 
-## Authentication
+   ```console
+   $ npm stage list
+   $ npm stage view <stage-id>
+   $ npm stage approve <stage-id>   # prompts for 2FA
+   ```
 
-Add an `NPM_TOKEN` repository secret: a granular token with read/write access
-to the `@jlap` scope. Once the package exists you can switch to
-[npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements)
-and drop the token.
+   You can also approve on npmjs.com (package → Staged versions). Staging needs
+   no 2FA; approval does.
 
-## Try it locally
+## Notes
 
-`npm publish --dry-run` reproduces the release packaging and upload steps
-without uploading. The test suite's pack smoke test already runs
-`npm pack` → `npm install -g` into a temp prefix.
+- Trusted publishing requires npm CLI `>= 11.5.1` and Node `>= 22.14.0`; the
+  workflow uses Node 24.
+- A newly created trusted publisher configuration expires if it does not
+  complete its first successful publish within 2 days.
+- `npm test` runs both in the workflow and via the `prepublishOnly` script,
+  which `npm stage publish` also triggers.
+- `npm publish --dry-run` reproduces the packaging step locally without staging
+  anything. The test suite's pack smoke test runs `npm pack` →
+  `npm install -g` into a temp prefix.

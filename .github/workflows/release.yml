@@ -1,8 +1,9 @@
 name: Release
 
-# Publishes to npm when a `v*` tag is pushed. The tag must match the
-# `version` in package.json (checked below). `npm publish` runs the
-# `prepublishOnly` gate, which runs the full test suite.
+# Stages a release on npm when a `v*` tag is pushed. The tag must match the
+# `version` in package.json (checked below). Authentication uses npm trusted
+# publishing (OIDC) — this publisher is stage-only, so a maintainer must
+# approve the staged package with 2FA before it goes live.
 
 on:
   push:
@@ -10,7 +11,8 @@ on:
       - "v*"
   workflow_dispatch:
 
-# `id-token: write` lets npm generate a signed provenance statement.
+# `id-token: write` is required for npm trusted publishing (OIDC) and lets
+# npm attach a signed provenance statement.
 permissions:
   contents: read
   id-token: write
@@ -28,11 +30,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-          cache: npm
+          # Never use a package-manager cache in a release build.
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci
@@ -47,15 +50,14 @@ jobs:
             exit 1
           fi
 
-      # `prepublishOnly: npm test` also runs on publish; this step makes the
+      # `prepublishOnly: npm test` also runs on stage; this step makes the
       # failure visible before the upload and keeps the workflow readable.
       - name: Test
         run: npm test
 
-      # Provenance uses the GitHub OIDC token; NPM_TOKEN authenticates the
-      # upload. After the first release you can switch to npm trusted
-      # publishing and drop the token.
-      - name: Publish
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted publishing (OIDC) authenticates the upload; no npm token is
+      # needed. The trusted publisher is stage-only, so this stages the package
+      # for a maintainer to review and approve with 2FA. Provenance is
+      # generated automatically for public repos.
+      - name: Stage release
+        run: npm stage publish --access public
