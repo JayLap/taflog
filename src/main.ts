@@ -9,8 +9,8 @@ import {
   JsonConfigStore,
   resolveConfig,
   setConfigValue,
-  type PartialConfig,
 } from "./adapters/out/config/config.ts"
+import type { PartialConfig } from "./domain/config.ts"
 import { resolveConfigPath } from "./adapters/out/config/paths.ts"
 import { JsonlEventLog } from "./adapters/out/store/jsonl-event-log.ts"
 import { AddAdjustment, SubAdjustment } from "./application/adjustment.ts"

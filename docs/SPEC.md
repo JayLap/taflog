@@ -35,8 +35,8 @@ Hexagonal, hand-wired composition root. See ADR-0005.
 
 ```
 src/
-  domain/        pure: Event/Entry types, deriveEntries, deriveTimer,
-                 aggregations, duration and date formatting
+  domain/        pure: Event/Entry types, reduceEvents, deriveTimer,
+                 aggregations, duration and date formatting, config schema
   ports/         Clock { now() }, EventLog { append, readAll, readRaw }
   application/   one use case per command: StartTask, StopTask, SwitchTask,
                  ShowStatus, AddAdjustment, SubAdjustment, RemoveEntry,

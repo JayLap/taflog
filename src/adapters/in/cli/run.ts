@@ -8,15 +8,18 @@ import type { ShowStatus } from "../../../application/status.ts"
 import type { StopTask } from "../../../application/stop-task.ts"
 import type { SwitchTask } from "../../../application/switch-task.ts"
 import { UsageError } from "../../../application/errors.ts"
+import {
+  CONFIG_KEYS,
+  type ConfigKey,
+  type ResolvedConfig,
+} from "../../../domain/config.ts"
 import type { WeekStart } from "../../../domain/datetime.ts"
 import { TaflogError } from "../../../domain/errors.ts"
 import type { ParsedArgs } from "./args.ts"
 import {
   configJson,
-  CONFIG_ORDER,
   renderConfig,
   renderSet,
-  type ConfigView,
 } from "./present-config.ts"
 import {
   renderAdjusted,
@@ -49,7 +52,7 @@ export interface CliDeps {
   /** Prompt when `add`/`sub` has no operands; set by the composition root. */
   adjustmentPrompt?: () => Promise<AdjustmentPromptAnswer | null>
   /** Effective configuration plus its sources; `config` renders it (SPEC §7). */
-  config: ConfigView
+  config: ResolvedConfig
   /** Validate and merge-write one config key; throws on bad input (SPEC §7). */
   setConfig: (key: string, value: string) => Promise<{ key: string; value: string | number }>
   version: string
@@ -225,10 +228,10 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
       case "config": {
         if (parsed.operands.length > 1) throw new UsageError("config takes at most one <key>")
         const rawKey = parsed.operands[0]
-        if (rawKey !== undefined && !CONFIG_ORDER.includes(rawKey as keyof ConfigView)) {
+        if (rawKey !== undefined && !CONFIG_KEYS.includes(rawKey as ConfigKey)) {
           throw new UsageError(`unknown config key: ${rawKey}`)
         }
-        const key = rawKey as keyof ConfigView | undefined
+        const key = rawKey as ConfigKey | undefined
         deps.stdout(
           parsed.options.json
             ? configJson(deps.config, {

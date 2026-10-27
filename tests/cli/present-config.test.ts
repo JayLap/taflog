@@ -1,13 +1,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import {
-  configJson,
-  renderConfig,
-  renderSet,
-  type ConfigView,
-} from "../../src/adapters/in/cli/present-config.ts"
+import { configJson, renderConfig, renderSet } from "../../src/adapters/in/cli/present-config.ts"
+import type { ResolvedConfig } from "../../src/domain/config.ts"
 
-const view: ConfigView = {
+const view: ResolvedConfig = {
   version: { value: 1, source: "default" },
   dir: { value: "/data/taflog", source: "default" },
   weekStart: { value: "monday", source: "file" },

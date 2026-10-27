@@ -1,5 +1,5 @@
+import type { ColorPolicy, IconsProfile } from "../../../domain/config.ts"
 import { formatDuration } from "../../../domain/duration.ts"
-import type { IconsProfile } from "./args.ts"
 
 /** One glyph per meaning (SPEC §9.4). */
 export interface Glyphs {
@@ -43,9 +43,6 @@ const PROFILES: Record<IconsProfile, Glyphs> = {
   nerd: NERD,
   ascii: ASCII,
 }
-
-/** Effective colour policy (SPEC §7, §9.4). */
-export type ColorPolicy = "auto" | "always" | "never"
 
 export interface StyleOptions {
   icons?: IconsProfile

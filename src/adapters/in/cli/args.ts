@@ -1,6 +1,6 @@
 import { UsageError } from "../../../application/errors.ts"
+import type { IconsProfile } from "../../../domain/config.ts"
 
-export type IconsProfile = "auto" | "nerd" | "ascii"
 export type ReportBy = "project" | "day"
 
 export interface GlobalOptions {

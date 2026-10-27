@@ -4,13 +4,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
-  CONFIG_KEYS,
   JsonConfigStore,
   parseCliValue,
   parseConfigFile,
   resolveConfig,
   setConfigValue,
 } from "../../src/adapters/out/config/config.ts"
+import { CONFIG_KEYS } from "../../src/domain/config.ts"
 import { ConfigError } from "../../src/adapters/out/config/errors.ts"
 import {
   defaultConfigFile,
