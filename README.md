@@ -59,6 +59,35 @@ Durations parse `90m`, `1h`, `1h30m`, `1.5h`, and a bare number of minutes
 (`50` → `50m`). Dates accept `YYYY-MM-DD`, `today`, `yesterday`, and weekday
 names (`mon`…`sun`) within the current week.
 
+### Interactive commands
+
+Running `taflog start`, `taflog switch`, `taflog add`, or `taflog sub` with no
+arguments in an interactive terminal prompts for the required values:
+
+- `start` and `switch`: Project, then an optional Description.
+- `add` and `sub`: Project, then Duration. `--date` and `--note` still work.
+
+Press Tab while typing to cycle through Project and Description candidates from
+the Log. Duration is freeform and has no completion candidates:
+
+```console
+$ taflog start
+Project: ac<Tab>
+Description (optional): new p<Tab>
+
+$ taflog switch
+Project: be<Tab>
+Description (optional): review<Tab>
+
+$ taflog add
+Project: ac<Tab>
+Duration: 30m
+```
+
+Outside a terminal (for example in a script or agent), these commands still
+require their operands and exit with a usage error. Pressing Ctrl+C cancels the
+prompt without writing an event.
+
 ### Output
 
 Every read command accepts `--json` (add `--pretty` to indent it) and emits a

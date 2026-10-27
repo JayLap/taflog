@@ -2,6 +2,7 @@
 import { join } from "node:path"
 import type { ParsedArgs } from "./adapters/in/cli/args.ts"
 import { parseArgs } from "./adapters/in/cli/args.ts"
+import { promptForAdjustment, promptForTimer } from "./adapters/in/cli/prompt.ts"
 import { runCli } from "./adapters/in/cli/run.ts"
 import { SystemClock } from "./adapters/out/clock/system-clock.ts"
 import {
@@ -14,6 +15,7 @@ import { resolveConfigPath } from "./adapters/out/config/paths.ts"
 import { JsonlEventLog } from "./adapters/out/store/jsonl-event-log.ts"
 import { AddAdjustment, SubAdjustment } from "./application/adjustment.ts"
 import { BuildReport } from "./application/build-report.ts"
+import { CompleteStart } from "./application/complete-start.ts"
 import { UsageError } from "./application/errors.ts"
 import { ExportLog } from "./application/export-log.ts"
 import { QueryLog } from "./application/query-log.ts"
@@ -73,6 +75,7 @@ async function main(): Promise<number> {
     strict: parsed.options.strict,
   })
   const maxTimerHours = config.maxTimerHours.value
+  const completeStart = new CompleteStart(log)
 
   const code = await runCli(parsed, {
     startTask: new StartTask(clock, log),
@@ -85,6 +88,10 @@ async function main(): Promise<number> {
     queryLog: new QueryLog(clock, log),
     buildReport: new BuildReport(clock, log),
     exportLog: new ExportLog(log),
+    timerPrompt: () =>
+      promptForTimer({ completeStart, input: process.stdin, output: process.stdout }),
+    adjustmentPrompt: () =>
+      promptForAdjustment({ completeStart, input: process.stdin, output: process.stdout }),
     config,
     setConfig: (key, value) => setConfigValue(store, key, value),
     version: version(),
@@ -92,6 +99,7 @@ async function main(): Promise<number> {
     stderr: (chunk) => process.stderr.write(chunk),
     env,
     isTTY: process.stdout.isTTY === true,
+    isInputTTY: process.stdin.isTTY === true,
     columns: process.stdout.columns,
   })
   return code

@@ -40,7 +40,7 @@ src/
   ports/         Clock { now() }, EventLog { append, readAll, readRaw }
   application/   one use case per command: StartTask, StopTask, SwitchTask,
                  ShowStatus, AddAdjustment, SubAdjustment, RemoveEntry,
-                 QueryLog, BuildReport
+                 QueryLog, BuildReport, CompleteStart
   adapters/
     in/cli/      arg parsing, dispatch, terminal and JSON presenters
     out/clock/   SystemClock
@@ -172,14 +172,14 @@ merge-writes. For `--json`, `taflog config` emits
 
 | Command | Purpose |
 |---------|---------|
-| `start <project> [description]` | Open a Timer |
+| `start <project> [description]` | Open a Timer; no operands prompts on a TTY |
 | `stop [description]` | Close the Timer, optionally setting its Description |
-| `switch <project> [description]` | Close and open atomically |
+| `switch <project> [description]` | Close and open atomically; no operands prompts on a TTY |
 | `status` | Current snapshot; also the default with no arguments |
 | `log [filters]` | List Entries and Adjustments |
 | `report [filters]` | Aggregate Timed and Adjusted time |
-| `add <project> <duration> [--date D] [--note N]` | Positive Adjustment |
-| `sub <project> <duration> [--date D] [--note N]` | Negative Adjustment |
+| `add <project> <duration> [--date D] [--note N]` | Positive Adjustment; no operands prompts on a TTY |
+| `sub <project> <duration> [--date D] [--note N]` | Negative Adjustment; no operands prompts on a TTY |
 | `rm [<id>]` | Tombstone an Entry/Adjustment; no id removes the most recent |
 | `config [<key>]` | Show effective configuration |
 | `set <key> <value>` | Write configuration |
@@ -205,8 +205,9 @@ Timer (SPEC §6, §10).
 
 ### 8.4 Exit codes
 
-`0` success · `1` runtime error · `2` usage error. Errors go to stderr prefixed
-`taflog:`. Unknown command or flag is exit 2.
+`0` success · `1` runtime error · `2` usage error · `130` interactive prompt
+cancelled. Errors go to stderr prefixed `taflog:`. Unknown command or flag is
+exit 2.
 
 ### 8.5 Parsing
 
@@ -216,6 +217,27 @@ Timer (SPEC §6, §10).
   and weekday names (`mon`…`sun`) within the current week.
 - **Projects**: stored verbatim (trimmed); filtering is case-insensitive.
 - **Descriptions**: the trailing argument(s), stored verbatim.
+
+### 8.6 Interactive commands
+
+When `taflog start`, `switch`, `add`, or `sub` is run with no operands in an
+interactive terminal, it prompts for the required values:
+
+- `start`/`switch`: Project, then an optional Description. `start` calls
+  `StartTask`; `switch` calls `SwitchTask`, closing the running Timer and
+  opening the new one at the same instant.
+- `add`/`sub`: Project, then Duration. The existing `--date` and `--note`
+  flags still apply, and the Adjustment use case validates the Duration.
+
+Tab completion suggests live Projects from Entries, the Timer, and
+Adjustments. For `start`/`switch`, it also suggests non-empty Descriptions from
+the selected Project's Entries and Timer. Candidates are ordered
+most-recent-first and deduplicated case-insensitively.
+
+The prompt is used only when stdin and stdout are TTYs and `--json` is off. A
+non-TTY or JSON invocation keeps the scriptable behaviour: `start`/`switch`
+require a Project and `add`/`sub` require `<project> <duration>`, exit 2, no
+prompt. Ctrl+C cancels with exit 130 and writes no Event.
 
 ## 9. Output
 
@@ -358,11 +380,15 @@ never parsed. This is the machine API for the Log's source of truth.
 - Application: each use case against fakes; state-transition table covered.
 - CLI: one end-to-end test drives the real entry point with `TAFLOG_DIR` and
   `TAFLOG_CONFIG` pointed at temp dirs.
+- Interactive prompt: Project/Description input for `start`/`switch` and
+  Project/Duration input for `add`/`sub`, plus re-prompting, against a seeded
+  Log; candidates are covered by the `CompleteStart` tests.
 - Rendering: golden tests for every specimen in §9; `--json` shape snapshots.
 
 ## 12. Non-goals and deferred
 
 Yearly log rotation, `compact`, tags, field-level `edit`, natural-language
 dates, `--from`/`--to` month names, sync/multi-device, shell completions,
-`init` wizard, localization, and any Windows-specific incantations beyond the
-per-OS directories in §5. Command surface is English-only in v1.
+interactive prompts beyond `start`/`switch`/`add`/`sub`, `init` wizard,
+localization, and any Windows-specific incantations beyond the per-OS
+directories in §5. Command surface is English-only in v1.
