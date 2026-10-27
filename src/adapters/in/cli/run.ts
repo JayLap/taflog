@@ -33,7 +33,7 @@ import {
 import { logJson, renderLog } from "./present-log.ts"
 import { renderReport, reportJson } from "./present-report.ts"
 import { createStyle, resolveColor, resolveIcons } from "./style.ts"
-import type { AdjustmentPromptAnswer, TimerPromptAnswer } from "./prompt.ts"
+import type { Intake } from "./intake.ts"
 
 /** Everything the CLI needs, injected by the composition root (ADR-0005). */
 export interface CliDeps {
@@ -47,10 +47,8 @@ export interface CliDeps {
   queryLog: QueryLog
   buildReport: BuildReport
   exportLog: ExportLog
-  /** Prompt when `start`/`switch` has no operands; set by the composition root. */
-  timerPrompt?: () => Promise<TimerPromptAnswer | null>
-  /** Prompt when `add`/`sub` has no operands; set by the composition root. */
-  adjustmentPrompt?: () => Promise<AdjustmentPromptAnswer | null>
+  /** Resolves operands, prompting when absent; set by the composition root. */
+  intake: Intake
   /** Effective configuration plus its sources; `config` renders it (SPEC §7). */
   config: ResolvedConfig
   /** Validate and merge-write one config key; throws on bad input (SPEC §7). */
@@ -61,7 +59,6 @@ export interface CliDeps {
   /** Presentation environment; defaults keep tests terminal-free. */
   env?: NodeJS.ProcessEnv
   isTTY?: boolean
-  isInputTTY?: boolean
   columns?: number
 }
 
@@ -147,7 +144,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "start": {
-        const input = await openTimerInput(parsed, deps, "start")
+        const input = await deps.intake.timer(parsed, "start")
         if (input === null) return 130
         const result = await deps.startTask.execute(input)
         warnSkipped(result.skipped, deps)
@@ -165,7 +162,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "switch": {
-        const input = await openTimerInput(parsed, deps, "switch")
+        const input = await deps.intake.timer(parsed, "switch")
         if (input === null) return 130
         const result = await deps.switchTask.execute({
           ...input,
@@ -177,7 +174,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
       }
       case "add":
       case "sub": {
-        const input = await adjustmentInput(parsed, deps, command)
+        const input = await deps.intake.adjustment(parsed, command)
         if (input === null) return 130
         const task = command === "add" ? deps.addAdjustment : deps.subAdjustment
         const result = await task.execute({
@@ -267,56 +264,6 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
     }
     throw error
   }
-}
-
-/** Shared operands for `start`/`switch`, prompting only when both are absent. */
-async function openTimerInput(
-  parsed: ParsedArgs,
-  deps: CliDeps,
-  command: "start" | "switch",
-): Promise<{ project: string; description?: string } | null> {
-  const project = parsed.operands[0]
-  if (project !== undefined) {
-    const description = joinOperands(parsed.operands.slice(1))
-    return { project, ...(description === undefined ? {} : { description }) }
-  }
-  if (
-    parsed.options.json ||
-    deps.isTTY !== true ||
-    deps.isInputTTY !== true ||
-    deps.timerPrompt === undefined
-  ) {
-    throw new UsageError(`${command} requires a <project>`)
-  }
-  const answer = await deps.timerPrompt()
-  if (answer === null) return null
-  return { project: answer.project, ...(answer.description === undefined ? {} : { description: answer.description }) }
-}
-
-/** Shared operands for `add`/`sub`, prompting only when both are absent. */
-async function adjustmentInput(
-  parsed: ParsedArgs,
-  deps: CliDeps,
-  command: "add" | "sub",
-): Promise<{ project: string; duration: string } | null> {
-  const [project, duration, ...rest] = parsed.operands
-  if (project !== undefined || duration !== undefined || rest.length > 0) {
-    if (project === undefined || duration === undefined || rest.length > 0) {
-      throw new UsageError(`${command} requires <project> <duration>`)
-    }
-    return { project, duration }
-  }
-  if (
-    parsed.options.json ||
-    deps.isTTY !== true ||
-    deps.isInputTTY !== true ||
-    deps.adjustmentPrompt === undefined
-  ) {
-    throw new UsageError(`${command} requires <project> <duration>`)
-  }
-  const answer = await deps.adjustmentPrompt()
-  if (answer === null) return null
-  return answer
 }
 
 function rangeInput(

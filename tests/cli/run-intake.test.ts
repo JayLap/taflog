@@ -1,6 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { parseArgs } from "../../src/adapters/in/cli/args.ts"
+import type { AdjustmentDraft, Intake, TimerDraft } from "../../src/adapters/in/cli/intake.ts"
 import type { CliDeps } from "../../src/adapters/in/cli/run.ts"
 import { runCli } from "../../src/adapters/in/cli/run.ts"
 import { AddAdjustment, SubAdjustment } from "../../src/application/adjustment.ts"
@@ -8,12 +9,17 @@ import { StartTask } from "../../src/application/start-task.ts"
 import { SwitchTask } from "../../src/application/switch-task.ts"
 import { FakeClock, InMemoryEventLog } from "../support/fakes.ts"
 
-function deps(
-  log: InMemoryEventLog,
-  timerPrompt: () => Promise<{ project: string; description?: string } | null>,
-  interactive: boolean,
-  adjustmentPrompt: () => Promise<{ project: string; duration: string } | null> = async () => null,
-): { deps: CliDeps; stdout: string[] } {
+function fakeIntake(answers: {
+  timer?: TimerDraft | null
+  adjustment?: AdjustmentDraft | null
+}): Intake {
+  return {
+    timer: async () => answers.timer ?? null,
+    adjustment: async () => answers.adjustment ?? null,
+  }
+}
+
+function deps(log: InMemoryEventLog, intake: Intake): { deps: CliDeps; stdout: string[] } {
   const stdout: string[] = []
   const clock = new FakeClock()
   const value = <T>(value: T) => ({ value, source: "default" as const })
@@ -22,8 +28,7 @@ function deps(
     switchTask: new SwitchTask(clock, log),
     addAdjustment: new AddAdjustment(clock, log),
     subAdjustment: new SubAdjustment(clock, log),
-    timerPrompt,
-    adjustmentPrompt,
+    intake,
     config: {
       version: value(1),
       dir: value("/tmp"),
@@ -35,15 +40,17 @@ function deps(
     version: "0.0.0",
     stdout: (chunk: string) => stdout.push(chunk),
     stderr: () => {},
-    isTTY: interactive,
-    isInputTTY: interactive,
+    isTTY: true,
   } as unknown as CliDeps
   return { deps, stdout }
 }
 
-test("interactive start with no operands uses the prompt", async () => {
+test("start with no operands uses the intake", async () => {
   const log = new InMemoryEventLog()
-  const fixture = deps(log, async () => ({ project: "acme", description: "new parser" }), true)
+  const fixture = deps(
+    log,
+    fakeIntake({ timer: { project: "acme", description: "new parser" } }),
+  )
   const code = await runCli(parseArgs(["start"]), fixture.deps)
 
   assert.equal(code, 0)
@@ -53,7 +60,7 @@ test("interactive start with no operands uses the prompt", async () => {
   assert.match(fixture.stdout.join(""), /acme/)
 })
 
-test("interactive switch with no operands uses the prompt", async () => {
+test("switch with no operands uses the intake", async () => {
   const log = new InMemoryEventLog([
     {
       v: 1,
@@ -63,7 +70,7 @@ test("interactive switch with no operands uses the prompt", async () => {
       project: "acme",
     },
   ])
-  const fixture = deps(log, async () => ({ project: "beta", description: "emails" }), true)
+  const fixture = deps(log, fakeIntake({ timer: { project: "beta", description: "emails" } }))
   const code = await runCli(parseArgs(["switch"]), fixture.deps)
 
   assert.equal(code, 0)
@@ -73,14 +80,9 @@ test("interactive switch with no operands uses the prompt", async () => {
   assert.match(fixture.stdout.join(""), /beta/)
 })
 
-test("interactive add with no operands prompts for Project and Duration", async () => {
+test("add with no operands uses the intake", async () => {
   const log = new InMemoryEventLog()
-  const fixture = deps(
-    log,
-    async () => null,
-    true,
-    async () => ({ project: "acme", duration: "30m" }),
-  )
+  const fixture = deps(log, fakeIntake({ adjustment: { project: "acme", duration: "30m" } }))
   const code = await runCli(parseArgs(["add"]), fixture.deps)
 
   assert.equal(code, 0)
@@ -90,14 +92,9 @@ test("interactive add with no operands prompts for Project and Duration", async 
   assert.match(fixture.stdout.join(""), /acme/)
 })
 
-test("interactive sub with no operands prompts for Project and Duration", async () => {
+test("sub with no operands uses the intake", async () => {
   const log = new InMemoryEventLog()
-  const fixture = deps(
-    log,
-    async () => null,
-    true,
-    async () => ({ project: "beta", duration: "30m" }),
-  )
+  const fixture = deps(log, fakeIntake({ adjustment: { project: "beta", duration: "30m" } }))
   const code = await runCli(parseArgs(["sub"]), fixture.deps)
 
   assert.equal(code, 0)
@@ -107,29 +104,11 @@ test("interactive sub with no operands prompts for Project and Duration", async 
   assert.match(fixture.stdout.join(""), /beta/)
 })
 
-test("cancelling the interactive prompt writes no Event and exits 130", async () => {
+test("cancelling the intake writes no Event and exits 130", async () => {
   const log = new InMemoryEventLog()
-  const fixture = deps(log, async () => null, true)
+  const fixture = deps(log, fakeIntake({ timer: null }))
   const code = await runCli(parseArgs(["start"]), fixture.deps)
 
   assert.equal(code, 130)
-  assert.equal(log.events.length, 0)
-})
-
-test("non-interactive start with no operands never calls the prompt", async () => {
-  const log = new InMemoryEventLog()
-  let called = false
-  const fixture = deps(
-    log,
-    async () => {
-      called = true
-      return { project: "acme" }
-    },
-    false,
-  )
-  const code = await runCli(parseArgs(["start"]), fixture.deps)
-
-  assert.equal(code, 2)
-  assert.equal(called, false)
   assert.equal(log.events.length, 0)
 })

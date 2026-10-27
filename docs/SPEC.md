@@ -40,9 +40,9 @@ src/
   ports/         Clock { now() }, EventLog { append, readAll, readRaw }
   application/   one use case per command: StartTask, StopTask, SwitchTask,
                  ShowStatus, AddAdjustment, SubAdjustment, RemoveEntry,
-                 QueryLog, BuildReport, CompleteStart
+                 QueryLog, BuildReport, LogCandidates
   adapters/
-    in/cli/      arg parsing, dispatch, terminal and JSON presenters
+    in/cli/      arg parsing, interactive intake, dispatch, presenters
     out/clock/   SystemClock
     out/store/   JsonlEventLog
     out/config/  config resolver
@@ -382,7 +382,7 @@ never parsed. This is the machine API for the Log's source of truth.
   `TAFLOG_CONFIG` pointed at temp dirs.
 - Interactive prompt: Project/Description input for `start`/`switch` and
   Project/Duration input for `add`/`sub`, plus re-prompting, against a seeded
-  Log; candidates are covered by the `CompleteStart` tests.
+  Log; candidates are covered by the `LogCandidates` tests.
 - Rendering: golden tests for every specimen in §9; `--json` shape snapshots.
 
 ## 12. Non-goals and deferred

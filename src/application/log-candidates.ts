@@ -1,33 +1,32 @@
 import { reduceEvents } from "../domain/reduce.ts"
 import type { EventLog } from "../ports/event-log.ts"
 
-export type StartCompletionKind = "project" | "description"
+export type CandidateKind = "project" | "description"
 
-export interface CompleteStartInput {
-  kind: StartCompletionKind
+export interface LogCandidatesInput {
+  kind: CandidateKind
   /** Restrict Description candidates to this Project (case-insensitive). */
   project?: string
 }
 
-export interface CompleteStartResult {
+export interface LogCandidatesResult {
   candidates: string[]
 }
 
 /**
- * Read-only candidates for opening a Timer (`start` or `switch`) when the CLI
- * prompts for a Project and Description. Projects come from live Entries, the
- * Timer, and Adjustments; Descriptions come from live Entries and the Timer.
- * Ordering is most-recent-first, and deduplication is case-insensitive
- * (SPEC §8.6).
+ * Read-only candidates for interactive completion: Projects come from live
+ * Entries, the Timer, and Adjustments; Descriptions come from live Entries and
+ * the Timer. Ordering is most-recent-first, and deduplication is
+ * case-insensitive (SPEC §8.6). Serves `start`, `switch`, `add`, and `sub`.
  */
-export class CompleteStart {
+export class LogCandidates {
   private readonly log: EventLog
 
   constructor(log: EventLog) {
     this.log = log
   }
 
-  async execute(input: CompleteStartInput): Promise<CompleteStartResult> {
+  async execute(input: LogCandidatesInput): Promise<LogCandidatesResult> {
     const { events } = await this.log.readAll()
     const state = reduceEvents(events)
     const entries = state.entries
