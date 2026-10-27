@@ -27,6 +27,41 @@ export function formatLocalTime(date: Date): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+const TIME_OF_DAY_HINT = /^\d{1,2}[:h]/i
+const TIME_OF_DAY = /^(\d{1,2})(?::(\d{1,2})|h(\d{0,2}))$/i
+
+/** True when `input` is a plausible time-of-day attempt (SPEC §8.5). */
+export function looksLikeTimeOfDay(input: string): boolean {
+  return TIME_OF_DAY_HINT.test(input.trim())
+}
+
+/**
+ * Parse a wall-clock time (`9:00`, `09:00`, `15h44`, `15h`) into an instant on
+ * `baseDate`'s local calendar day. Returns `null` for malformed or impossible
+ * times. Minutes default to zero.
+ */
+export function parseTimeOfDay(input: string, baseDate: Date): Date | null {
+  const match = TIME_OF_DAY.exec(input.trim())
+  if (match === null) return null
+  const hours = Number(match[1])
+  const minutes =
+    match[2] !== undefined
+      ? Number(match[2])
+      : match[3] === undefined || match[3] === ""
+        ? 0
+        : Number(match[3])
+  if (hours > 23 || minutes > 59) return null
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    hours,
+    minutes,
+    0,
+    0,
+  )
+}
+
 /** Whole seconds of `[start, end)` that fall inside `[from, to)`, never negative. */
 export function overlapSeconds(start: Date, end: Date, from: Date, to: Date): number {
   const begin = Math.max(start.getTime(), from.getTime())

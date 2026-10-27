@@ -3,9 +3,11 @@ import assert from "node:assert/strict"
 import {
   formatLocalDate,
   formatLocalTime,
+  looksLikeTimeOfDay,
   overlapSeconds,
   parseDate,
   parseLocalDate,
+  parseTimeOfDay,
   startOfLocalDay,
   startOfNextLocalDay,
 } from "../../src/domain/datetime.ts"
@@ -67,6 +69,44 @@ test("parseDate returns null for malformed or impossible input", () => {
   const now = new Date(2025, 9, 23, 13, 5)
   for (const input of ["", "nope", "monday", "2025-02-30", "2025/10/23", "next monday", "13"]) {
     assert.equal(parseDate(input, now), null, `parseDate(${JSON.stringify(input)})`)
+  }
+})
+
+test("parseTimeOfDay resolves accepted wall-clock forms on the base date", () => {
+  const base = new Date(2025, 9, 23, 13, 5, 42)
+  const cases: Array<[string, number, number]> = [
+    ["9:00", 9, 0],
+    ["09:00", 9, 0],
+    ["15h44", 15, 44],
+    ["15h", 15, 0],
+    ["9h5", 9, 5],
+    ["0:00", 0, 0],
+    ["23:59", 23, 59],
+    ["  15H44  ", 15, 44],
+  ]
+  for (const [input, hours, minutes] of cases) {
+    const at = parseTimeOfDay(input, base)
+    assert.ok(at !== null, input)
+    assert.equal(formatLocalDate(at), "2025-10-23", input)
+    assert.equal(at.getHours(), hours, input)
+    assert.equal(at.getMinutes(), minutes, input)
+    assert.equal(at.getSeconds(), 0, input)
+  }
+})
+
+test("parseTimeOfDay rejects malformed or impossible times", () => {
+  const base = new Date(2025, 9, 23, 13, 5)
+  for (const input of ["24:00", "12:60", "15h60", "9:", "15:44:00", "15h44m", "nope", ""]) {
+    assert.equal(parseTimeOfDay(input, base), null, JSON.stringify(input))
+  }
+})
+
+test("looksLikeTimeOfDay recognises attempts without accepting bare numbers", () => {
+  for (const input of ["9:00", "15h44", "25:00", "15h60", "15:44:00"]) {
+    assert.equal(looksLikeTimeOfDay(input), true, input)
+  }
+  for (const input of ["", "15", "9am", "noon", "fixed 9:00 bug"]) {
+    assert.equal(looksLikeTimeOfDay(input), false, input)
   }
 })
 

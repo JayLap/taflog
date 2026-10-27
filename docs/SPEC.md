@@ -78,7 +78,9 @@ The Log is one JSON object per line, each carrying its own schema version.
 
 - `v` — schema version, integer, `1`.
 - `id` — Event identity (see §4.4).
-- `at` — ISO-8601 UTC instant of the event.
+- `at` — ISO-8601 UTC instant at which the Event takes effect. For `stop`
+  and `switch` this may be an explicit time earlier than when the line was
+  appended (§6).
 - `entry` / `from` — the id of the Entry being closed or amended.
 - `date` — local calendar date (`YYYY-MM-DD`) an Adjustment counts toward.
 - `delta` — signed duration in **seconds** (positive = `add`, negative = `sub`).
@@ -142,6 +144,15 @@ shows them; `rm` accepts a full id or an unambiguous prefix.
   on `log`.
 - **Forgotten Timer**: an open Entry older than `maxTimerHours` (default `8`)
   is reported by `status`; `stop`/`switch` refuse to close it unless `--force`.
+  When an explicit time is supplied, the threshold is measured against that
+  effective end, not wall-clock now.
+- **Explicit stop/switch time**: `stop [<time>]` and
+  `switch <project> [<time>]` accept a local wall-clock time (`9:00`,
+  `09:00`, `15h44`, `15h`). It always falls on today's local date and becomes
+  the Event's `at`, closing the Entry and, for `switch`, opening the next
+  Timer. Times in the future or before the open Timer's opening instant are
+  usage errors; `switch` with a time while idle is refused. `--date` is not
+  supported by `stop` or `switch`.
 
 ## 7. Configuration
 
@@ -173,8 +184,8 @@ merge-writes. For `--json`, `taflog config` emits
 | Command | Purpose |
 |---------|---------|
 | `start <project> [description]` | Open a Timer; no operands prompts on a TTY |
-| `stop [description]` | Close the Timer, optionally setting its Description |
-| `switch <project> [description]` | Close and open atomically; no operands prompts on a TTY |
+| `stop [<time>] [description]` | Close the Timer, optionally at an explicit time and/or setting its Description |
+| `switch <project> [<time>] [description]` | Close and open atomically, optionally at an explicit time; no operands prompts on a TTY |
 | `status` | Current snapshot; also the default with no arguments |
 | `log [filters]` | List Entries and Adjustments |
 | `report [filters]` | Aggregate Timed and Adjusted time |
@@ -215,6 +226,9 @@ exit 2.
   (`50` → `50m`). Anything else is a usage error.
 - **Dates** (`--date`, `--from`, `--to`): `YYYY-MM-DD`, `today`, `yesterday`,
   and weekday names (`mon`…`sun`) within the current week.
+- **Times** (`stop`, `switch`): `9:00`, `09:00`, `15h44`, `15h`, `9h`;
+  minutes default to `00`. They are always resolved on today's local date.
+  `--date` is a usage error on these commands.
 - **Projects**: stored verbatim (trimmed); filtering is case-insensitive.
 - **Descriptions**: the trailing argument(s), stored verbatim.
 
@@ -225,7 +239,8 @@ interactive terminal, it prompts for the required values:
 
 - `start`/`switch`: Project, then an optional Description. `start` calls
   `StartTask`; `switch` calls `SwitchTask`, closing the running Timer and
-  opening the new one at the same instant.
+  opening the new one at the same instant. An explicit `switch` time is only
+  accepted as an operand; it is not prompted for.
 - `add`/`sub`: Project, then Duration. The existing `--date` and `--note`
   flags still apply, and the Adjustment use case validates the Duration.
 
@@ -369,6 +384,11 @@ never parsed. This is the machine API for the Log's source of truth.
 | `switch` while running | Closes the open Entry and opens the new one at the same instant |
 | `stop` while idle | Error, exit 1: `nothing is running` |
 | `stop [description]` | Closes the Timer, optionally setting its Description |
+| `stop <time> [description]` | Closes the Timer at today's local wall-clock time |
+| `switch <project> <time> [description]` | Closes and reopens at today's local wall-clock time |
+| `switch <time>` while idle | Refused: `switch cannot take a time while no Timer is running — use start` |
+| explicit time in the future | Refused: usage error, exit 2 |
+| explicit time before the Timer's opening instant | Refused: usage error, exit 2 |
 | `add` / `sub` while running | Allowed; Adjustments are independent of the Timer |
 | `sub` driving a day negative | Allowed; rendered negative, never clamped |
 | `rm` on the open Timer | Refused: `that entry is running — stop it first` |
@@ -391,7 +411,8 @@ never parsed. This is the machine API for the Log's source of truth.
 ## 12. Non-goals and deferred
 
 Yearly log rotation, `compact`, tags, field-level `edit`, natural-language
-dates, `--from`/`--to` month names, sync/multi-device, shell completions,
+dates, `--from`/`--to` month names, backdated stop/switch dates beyond today
+(`--date` on `stop`/`switch`), sync/multi-device, shell completions,
 interactive prompts beyond `start`/`switch`/`add`/`sub`, `init` wizard,
 localization, and any Windows-specific incantations beyond the per-OS
 directories in §5. Command surface is English-only in v1.

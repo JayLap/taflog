@@ -5,11 +5,14 @@ import { deriveTimer } from "../domain/reduce.ts"
 import { DEFAULT_MAX_TIMER_HOURS, isForgotten } from "../domain/timer.ts"
 import type { Clock } from "../ports/clock.ts"
 import type { EventLog } from "../ports/event-log.ts"
+import { assertAfterTimerStart, resolveEffectiveInstant } from "./effective-time.ts"
 import { ForgottenTimerError, UsageError } from "./errors.ts"
 
 export interface SwitchInput {
   project: string
   description?: string
+  /** Optional local wall-clock time, e.g. `15h44` (SPEC §6, §8.5). */
+  time?: string
   force?: boolean
 }
 
@@ -24,7 +27,7 @@ export interface SwitchResult {
   timer: Timer
 }
 
-/** `switch <project> [description]`: close the Timer and open the next (SPEC §10). */
+/** `switch <project> [<time>] [description]`: close the Timer and open the next (SPEC §10). */
 export class SwitchTask {
   private readonly clock: Clock
   private readonly log: EventLog
@@ -52,18 +55,17 @@ export class SwitchTask {
 
     const description = clean(input.description)
     const running = deriveTimer(events)
-    const at = this.clock.now()
-
-    if (running !== null && input.force !== true && isForgotten(running, at, this.maxTimerHours)) {
-      throw new ForgottenTimerError(running.project, running.start, this.maxTimerHours)
-    }
+    const now = this.clock.now()
 
     if (running === null) {
+      if (input.time !== undefined) {
+        throw new UsageError("switch cannot take a time while no Timer is running — use start")
+      }
       const event: StartEvent = {
         v: 1,
         id: this.generateId(),
         t: "start",
-        at: at.toISOString(),
+        at: now.toISOString(),
         project,
       }
       if (description !== undefined) event.description = description
@@ -72,9 +74,15 @@ export class SwitchTask {
         id: event.id,
         project,
         description: description ?? "",
-        start: at,
+        start: now,
       }
       return { skipped, event, closed: null, timer }
+    }
+
+    const at = resolveEffectiveInstant("switch", input.time, now)
+    assertAfterTimerStart("switch", at, running.start)
+    if (input.force !== true && isForgotten(running, at, this.maxTimerHours)) {
+      throw new ForgottenTimerError(running.project, running.start, this.maxTimerHours)
     }
 
     const event: SwitchEvent = {

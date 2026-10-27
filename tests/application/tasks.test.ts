@@ -4,7 +4,7 @@ import { FakeClock, InMemoryEventLog } from "../support/fakes.ts"
 import { StartTask } from "../../src/application/start-task.ts"
 import { StopTask } from "../../src/application/stop-task.ts"
 import { ShowStatus } from "../../src/application/status.ts"
-import { AlreadyRunningError, NothingRunningError } from "../../src/application/errors.ts"
+import { AlreadyRunningError, NothingRunningError, UsageError } from "../../src/application/errors.ts"
 import { ForgottenTimerError } from "../../src/application/errors.ts"
 import { formatLocalDate } from "../../src/domain/datetime.ts"
 import type { Event } from "../../src/domain/events.ts"
@@ -64,6 +64,55 @@ test("StopTask applies a Description given at stop time", async () => {
   clock.set("2025-10-23T09:36:00")
   const result = await new StopTask(clock, log).execute({ description: "final" })
   assert.equal(result.entry.description, "final")
+})
+
+test("StopTask closes the Timer at an explicit time", async () => {
+  const clock = new FakeClock("2025-10-23T09:12:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme", description: "new parser" })
+  clock.set("2025-10-23T18:00:00")
+  const result = await new StopTask(clock, log).execute({ time: "17:00" })
+
+  const expected = new Date(2025, 9, 23, 17, 0)
+  assert.equal(result.entry.end.getTime(), expected.getTime())
+  assert.equal(result.event.at, expected.toISOString())
+  assert.equal(log.events[1]?.at, expected.toISOString())
+})
+
+test("StopTask rejects a future or pre-start explicit time", async () => {
+  const clock = new FakeClock("2025-10-23T09:12:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T10:00:00")
+
+  await assert.rejects(
+    () => new StopTask(clock, log).execute({ time: "11:00" }),
+    (error: unknown) => error instanceof UsageError && /in the future/.test(error.message),
+  )
+  await assert.rejects(
+    () => new StopTask(clock, log).execute({ time: "09:00" }),
+    (error: unknown) => error instanceof UsageError && /before the timer started/.test(error.message),
+  )
+  assert.equal(log.events.length, 1)
+})
+
+test("StopTask applies the forgotten limit to the explicit end", async () => {
+  const clock = new FakeClock("2025-10-23T09:00:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T18:00:00")
+
+  const underLimit = await new StopTask(clock, log).execute({ time: "17:00" })
+  assert.equal(underLimit.entry.end.getTime(), new Date(2025, 9, 23, 17, 0).getTime())
+
+  const secondLog = new InMemoryEventLog()
+  const secondClock = new FakeClock("2025-10-23T09:00:00")
+  await new StartTask(secondClock, secondLog).execute({ project: "beta" })
+  secondClock.set("2025-10-23T18:00:00")
+  await assert.rejects(
+    () => new StopTask(secondClock, secondLog).execute({ time: "18:00" }),
+    (error: unknown) => error instanceof ForgottenTimerError,
+  )
 })
 
 test("StopTask fails when nothing is running", async () => {

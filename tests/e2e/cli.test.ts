@@ -455,3 +455,78 @@ test("exit codes follow SPEC §8.4 and errors are prefixed", () => {
     }
   })
 })
+
+function localMidnight(): Date {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+function seedStartToday(dir: string, project: string): void {
+  appendFileSync(
+    join(dir, "events.ndjson"),
+    `${JSON.stringify({
+      v: 1,
+      id: "today001",
+      t: "start",
+      at: localMidnight().toISOString(),
+      project,
+    })}\n`,
+  )
+}
+
+test("stop accepts an explicit local time", () => {
+  withTempDir((dir) => {
+    seedStartToday(dir, "acme")
+    const stopped = run(dir, ["stop", "00:00"])
+
+    assert.equal(stopped.status, 0)
+    const events = readEvents(dir)
+    assert.equal(events.length, 2)
+    assert.equal(events[1]?.t, "stop")
+    assert.equal(events[1]?.at, localMidnight().toISOString())
+  })
+})
+
+test("switch accepts an explicit local time", () => {
+  withTempDir((dir) => {
+    seedStartToday(dir, "acme")
+    const switched = run(dir, ["switch", "beta", "00:00", "emails"])
+
+    assert.equal(switched.status, 0)
+    const events = readEvents(dir)
+    assert.equal(events.length, 2)
+    assert.equal(events[1]?.t, "switch")
+    assert.equal(events[1]?.at, localMidnight().toISOString())
+    assert.equal(events[1]?.project, "beta")
+    assert.equal(events[1]?.description, "emails")
+
+    const status = JSON.parse(run(dir, ["status", "--json"]).stdout)
+    assert.equal(status.running.project, "beta")
+  })
+})
+
+test("switch with a time while idle is refused", () => {
+  withTempDir((dir) => {
+    const result = run(dir, ["switch", "beta", "00:00"])
+    assert.equal(result.status, 2)
+    assert.match(result.stderr, /no Timer is running/)
+    assert.equal(existsSync(join(dir, "events.ndjson")), false)
+  })
+})
+
+test("stop and switch reject --date", () => {
+  withTempDir((dir) => {
+    seedStartToday(dir, "acme")
+    assert.equal(run(dir, ["stop", "00:00", "--date", "today"]).status, 2)
+    assert.equal(run(dir, ["switch", "beta", "00:00", "--date", "today"]).status, 2)
+  })
+})
+
+test("an invalid time in the time slot is a usage error", () => {
+  withTempDir((dir) => {
+    seedStartToday(dir, "acme")
+    const result = run(dir, ["stop", "25:00"])
+    assert.equal(result.status, 2)
+    assert.match(result.stderr, /invalid time/)
+  })
+})

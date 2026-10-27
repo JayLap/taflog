@@ -196,3 +196,28 @@ test("completion candidates are stripped of terminal control sequences", async (
   assert.ok(!text.includes("\u001b[31m"), "candidate escape leaked to readline")
   assert.match(text, /ac\[31mme/)
 })
+
+test("switch timer parses a time in the second slot", () => {
+  const { intake } = makeIntake()
+  return intake
+    .timer(parseArgs(["switch", "beta", "15h44", "emails"]), "switch")
+    .then((result) => {
+      assert.deepEqual(result, { project: "beta", time: "15h44", description: "emails" })
+    })
+})
+
+test("switch timer leaves a non-time second operand as the Description", async () => {
+  const { intake } = makeIntake()
+  assert.deepEqual(await intake.timer(parseArgs(["switch", "beta", "emails"]), "switch"), {
+    project: "beta",
+    description: "emails",
+  })
+})
+
+test("start does not parse a time operand", async () => {
+  const { intake } = makeIntake()
+  assert.deepEqual(await intake.timer(parseArgs(["start", "acme", "15h44"]), "start"), {
+    project: "acme",
+    description: "15h44",
+  })
+})

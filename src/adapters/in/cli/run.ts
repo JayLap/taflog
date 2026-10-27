@@ -13,7 +13,7 @@ import {
   type ConfigKey,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
-import type { WeekStart } from "../../../domain/datetime.ts"
+import { looksLikeTimeOfDay, type WeekStart } from "../../../domain/datetime.ts"
 import { TaflogError } from "../../../domain/errors.ts"
 import type { ParsedArgs } from "./args.ts"
 import {
@@ -65,8 +65,8 @@ export const USAGE = `taflog — minimalist CLI time tracker
 
 Usage:
   taflog start <project> [description]
-  taflog stop [description]
-  taflog switch <project> [description]
+  taflog stop [<time>] [description]
+  taflog switch <project> [<time>] [description]
   taflog status
   taflog log [filters]
   taflog report [filters]
@@ -87,6 +87,10 @@ Filters:
   --details                   add Description sub-rows to the report grid
   --ids                       show Entry/Adjustment identities (log)
   --seconds                   show seconds on log durations
+
+Time (stop/switch):
+  <time>                      local wall-clock time, e.g. 9:00, 15h44, 15h
+                              (always today; stop/switch do not accept --date)
 
 Global flags:
   --dir <path>              data directory
@@ -145,9 +149,10 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "stop": {
-        const description = joinOperands(parsed.operands)
+        rejectDate(parsed, "stop")
+        const input = splitStopOperands(parsed.operands)
         const result = await deps.stopTask.execute({
-          ...(description === undefined ? {} : { description }),
+          ...input,
           ...(parsed.options.force ? { force: true } : {}),
         })
         warnSkipped(result.skipped, deps)
@@ -155,6 +160,7 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "switch": {
+        rejectDate(parsed, "switch")
         const input = await deps.intake.timer(parsed, "switch")
         if (input === null) return 130
         const result = await deps.switchTask.execute({
@@ -287,6 +293,24 @@ function rangeInput(
 function joinOperands(parts: string[]): string | undefined {
   const text = parts.join(" ").trim()
   return text === "" ? undefined : text
+}
+
+/** `stop [<time>] [description]`: time is only in the first slot. */
+function splitStopOperands(parts: string[]): { time?: string; description?: string } {
+  const [first, ...rest] = parts
+  if (first !== undefined && looksLikeTimeOfDay(first)) {
+    const description = joinOperands(rest)
+    return { time: first, ...(description === undefined ? {} : { description }) }
+  }
+  const description = joinOperands(parts)
+  return description === undefined ? {} : { description }
+}
+
+/** `stop`/`switch` times are always today; a date flag would be silently wrong. */
+function rejectDate(parsed: ParsedArgs, command: "stop" | "switch"): void {
+  if (parsed.options.date !== null) {
+    throw new UsageError(`--date is not supported by ${command}`)
+  }
 }
 
 function warnSkipped(skipped: number, deps: CliDeps): void {

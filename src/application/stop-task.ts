@@ -5,10 +5,13 @@ import { deriveTimer } from "../domain/reduce.ts"
 import { DEFAULT_MAX_TIMER_HOURS, isForgotten } from "../domain/timer.ts"
 import type { Clock } from "../ports/clock.ts"
 import type { EventLog } from "../ports/event-log.ts"
+import { assertAfterTimerStart, resolveEffectiveInstant } from "./effective-time.ts"
 import { ForgottenTimerError, NothingRunningError } from "./errors.ts"
 
 export interface StopInput {
   description?: string
+  /** Optional local wall-clock time, e.g. `15h44` (SPEC §6, §8.5). */
+  time?: string
   force?: boolean
 }
 
@@ -18,7 +21,7 @@ export interface StopResult {
   entry: Entry
 }
 
-/** `stop [description]`: close the running Timer (SPEC §8.1, §10). */
+/** `stop [<time>] [description]`: close the running Timer (SPEC §8.1, §10). */
 export class StopTask {
   private readonly clock: Clock
   private readonly log: EventLog
@@ -44,7 +47,9 @@ export class StopTask {
       throw new NothingRunningError()
     }
 
-    const at = this.clock.now()
+    const now = this.clock.now()
+    const at = resolveEffectiveInstant("stop", input.time, now)
+    assertAfterTimerStart("stop", at, running.start)
     if (input.force !== true && isForgotten(running, at, this.maxTimerHours)) {
       throw new ForgottenTimerError(running.project, running.start, this.maxTimerHours)
     }

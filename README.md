@@ -35,8 +35,8 @@ command and flag.
 | Command | Purpose |
 |---------|---------|
 | `start <project> [description]` | Open a timer |
-| `stop [description]` | Close the running timer |
-| `switch <project> [description]` | Close and open a new timer in one step |
+| `stop [<time>] [description]` | Close the running timer, optionally at a time |
+| `switch <project> [<time>] [description]` | Close and open a new timer in one step, optionally at a time |
 | `status` | What's running, plus today's total |
 | `log [filters]` | List entries and adjustments |
 | `report [filters]` | Time by project or by day |
@@ -58,6 +58,22 @@ command and flag.
 Durations parse `90m`, `1h`, `1h30m`, `1.5h`, and a bare number of minutes
 (`50` → `50m`). Dates accept `YYYY-MM-DD`, `today`, `yesterday`, and weekday
 names (`mon`…`sun`) within the current week.
+
+### Correcting a forgotten stop or switch
+
+`stop` accepts an optional local wall-clock time as its first operand;
+`switch` accepts it after the project. This closes the running timer at that
+time, and `switch` starts the next timer at the same instant:
+
+```console
+$ taflog stop 15h44
+$ taflog stop 9:00 "finished the parser fix"
+$ taflog switch beta 13:15 "answering emails"
+```
+
+Times accept `9:00`, `09:00`, `15h44`, `15h`, and always mean today. Times in
+the future or before the running timer started are rejected, and `switch` with
+a time is refused while idle. `--date` is not supported by `stop` or `switch`.
 
 ### Interactive commands
 

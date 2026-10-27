@@ -2,6 +2,7 @@ import { createInterface, type Interface } from "node:readline"
 import type { Readable, Writable } from "node:stream"
 import type { LogCandidates } from "../../../application/log-candidates.ts"
 import { UsageError } from "../../../application/errors.ts"
+import { looksLikeTimeOfDay } from "../../../domain/datetime.ts"
 import type { ParsedArgs } from "./args.ts"
 import { sanitizeForTerminal } from "./style.ts"
 
@@ -9,6 +10,8 @@ import { sanitizeForTerminal } from "./style.ts"
 export interface TimerDraft {
   project: string
   description?: string
+  /** `switch` may carry an explicit wall-clock time (SPEC §8.5). */
+  time?: string
 }
 
 /** An Adjustment's input, gathered from operands or a prompt. */
@@ -62,8 +65,13 @@ class TerminalIntake implements Intake {
   async timer(parsed: ParsedArgs, command: "start" | "switch"): Promise<TimerDraft | null> {
     const project = parsed.operands[0]
     if (project !== undefined) {
-      const description = join(parsed.operands.slice(1))
-      return { project, ...(description === undefined ? {} : { description }) }
+      const time = command === "switch" ? explicitTime(parsed.operands[1]) : undefined
+      const description = join(parsed.operands.slice(time === undefined ? 1 : 2))
+      return {
+        project,
+        ...(time === undefined ? {} : { time }),
+        ...(description === undefined ? {} : { description }),
+      }
     }
     if (!this.canPrompt(parsed)) throw new UsageError(`${command} requires a <project>`)
 
@@ -143,6 +151,11 @@ async function askProject(prompt: LinePrompt, logCandidates: LogCandidates): Pro
 function join(parts: string[]): string | undefined {
   const text = parts.join(" ").trim()
   return text === "" ? undefined : text
+}
+
+/** `switch <project> <time> [description]`: time is only in the second slot. */
+function explicitTime(operand: string | undefined): string | undefined {
+  return operand !== undefined && looksLikeTimeOfDay(operand) ? operand : undefined
 }
 
 /** Log-derived candidates can carry terminal controls; strip them before readline. */
