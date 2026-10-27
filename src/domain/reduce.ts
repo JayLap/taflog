@@ -3,12 +3,20 @@ import type { Adjustment, Entry, Timer } from "./entry.ts"
 
 /**
  * Replay the Log into derived views (SPEC §4.2). Events are applied in file
- * order; the result is deterministic and never mutates the input.
+ * order; the result is deterministic and never mutates the input. This is the
+ * single replay: every derived view, including the removable sequence bare `rm`
+ * walks, is projected from the state it returns.
  */
 export interface LogState {
   entries: Entry[]
   timer: Timer | null
   adjustments: Adjustment[]
+  /**
+   * Live Entries and Adjustments in Log order, for bare `rm` (SPEC §8.1, §10).
+   * An Entry is listed when it closes; the open Timer is never listed, because
+   * it is not a completed Entry.
+   */
+  removableIds: string[]
 }
 
 interface OpenEntry {
@@ -21,6 +29,7 @@ interface OpenEntry {
 export function reduceEvents(events: Event[]): LogState {
   const closed: Entry[] = []
   const adjustments: Adjustment[] = []
+  const removableIds: string[] = []
   const open = new Map<string, OpenEntry>()
   const deleted = new Set<string>()
 
@@ -28,6 +37,7 @@ export function reduceEvents(events: Event[]): LogState {
     const entry = open.get(id)
     if (entry === undefined) return
     open.delete(id)
+    removableIds.push(id)
     closed.push({
       id: entry.id,
       project: entry.project,
@@ -67,6 +77,7 @@ export function reduceEvents(events: Event[]): LogState {
           delta: event.delta,
           ...(event.note === undefined ? {} : { note: event.note }),
         })
+        removableIds.push(event.id)
         break
       case "delete":
         deleted.add(event.entry)
@@ -75,61 +86,16 @@ export function reduceEvents(events: Event[]): LogState {
     }
   }
 
-  const entries = closed.filter((entry) => !deleted.has(entry.id))
-  const liveAdjustments = adjustments.filter((adjustment) => !deleted.has(adjustment.id))
-  return { entries, timer: lastOpen(open), adjustments: liveAdjustments }
-}
-
-export function deriveEntries(events: Event[]): Entry[] {
-  return reduceEvents(events).entries
+  return {
+    entries: closed.filter((entry) => !deleted.has(entry.id)),
+    timer: lastOpen(open),
+    adjustments: adjustments.filter((adjustment) => !deleted.has(adjustment.id)),
+    removableIds: removableIds.filter((id) => !deleted.has(id)),
+  }
 }
 
 export function deriveTimer(events: Event[]): Timer | null {
   return reduceEvents(events).timer
-}
-
-export function deriveAdjustments(events: Event[]): Adjustment[] {
-  return reduceEvents(events).adjustments
-}
-
-/** A live Entry or Adjustment that `rm` may tombstone. */
-export interface Removable {
-  kind: "entry" | "adjust"
-  id: string
-}
-
-/**
- * Live Entries and Adjustments in Log order, for bare `rm` (SPEC §8.1, §10).
- * An Entry is listed when it closes; the open Timer is never listed, because
- * it is not a completed Entry.
- */
-export function deriveRemovable(events: Event[]): Removable[] {
-  const items: Removable[] = []
-  const open = new Set<string>()
-  const deleted = new Set<string>()
-
-  for (const event of events) {
-    switch (event.t) {
-      case "start":
-        open.add(event.id)
-        break
-      case "switch":
-        if (open.delete(event.from)) items.push({ kind: "entry", id: event.from })
-        open.add(event.id)
-        break
-      case "stop":
-        if (open.delete(event.entry)) items.push({ kind: "entry", id: event.entry })
-        break
-      case "adjust":
-        items.push({ kind: "adjust", id: event.id })
-        break
-      case "delete":
-        deleted.add(event.entry)
-        break
-    }
-  }
-
-  return items.filter((item) => !deleted.has(item.id))
 }
 
 /**

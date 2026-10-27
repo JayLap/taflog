@@ -1,8 +1,8 @@
-import type { DeleteEvent, Event } from "../domain/events.ts"
+import type { DeleteEvent } from "../domain/events.ts"
 import type { Adjustment, Entry } from "../domain/entry.ts"
 import { newId, resolvePrefix } from "../domain/identity.ts"
 import type { LogState } from "../domain/reduce.ts"
-import { deriveRemovable, reduceEvents } from "../domain/reduce.ts"
+import { reduceEvents } from "../domain/reduce.ts"
 import type { Clock } from "../ports/clock.ts"
 import type { EventLog } from "../ports/event-log.ts"
 import {
@@ -46,7 +46,7 @@ export class RemoveEntry {
   async execute(input: RemoveInput = {}): Promise<RemoveResult> {
     const { events, skipped } = await this.log.readAll()
     const state = reduceEvents(events)
-    const targetId = this.resolveTarget(input.id, events, state)
+    const targetId = this.resolveTarget(input.id, state)
 
     if (state.timer !== null && state.timer.id === targetId) {
       throw new RunningEntryError()
@@ -72,11 +72,11 @@ export class RemoveEntry {
     throw new NothingToRemoveError()
   }
 
-  private resolveTarget(input: string | undefined, events: Event[], state: LogState): string {
+  private resolveTarget(input: string | undefined, state: LogState): string {
     if (input === undefined || input.trim() === "") {
-      const last = deriveRemovable(events).at(-1)
+      const last = state.removableIds.at(-1)
       if (last === undefined) throw new NothingToRemoveError()
-      return last.id
+      return last
     }
 
     const ids = [
