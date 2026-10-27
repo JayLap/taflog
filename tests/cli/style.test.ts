@@ -1,11 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import {
-  createStyle,
-  resolveColor,
-  resolveIcons,
-  truncate,
-} from "../../src/adapters/in/cli/style.ts"
+import { createStyle, resolveColor, truncate } from "../../src/adapters/in/cli/style.ts"
 
 test("the default Style is plain, auto-glyph, and untruncated", () => {
   const style = createStyle()
@@ -50,17 +45,9 @@ test("truncate never wraps and uses a single ellipsis", () => {
   assert.equal(truncate("abcdef", Number.POSITIVE_INFINITY), "abcdef")
 })
 
-test("resolveIcons follows flag > env > auto", () => {
-  assert.equal(resolveIcons("nerd", { TAFLOG_ICONS: "ascii" }), "nerd")
-  assert.equal(resolveIcons(null, { TAFLOG_ICONS: "ascii" }), "ascii")
-  assert.equal(resolveIcons(null, { TAFLOG_ICONS: "wat" }), "auto")
-  assert.equal(resolveIcons(null, {}), "auto")
-})
-
-test("resolveColor follows --no-color, NO_COLOR, and TTY", () => {
-  assert.equal(resolveColor(false, {}, true), true)
-  assert.equal(resolveColor(false, {}, false), false)
-  assert.equal(resolveColor(true, {}, true), false)
-  assert.equal(resolveColor(false, { NO_COLOR: "1" }, true), false)
-  assert.equal(resolveColor(false, { NO_COLOR: "" }, true), false)
+test("resolveColor reduces the resolved policy against TTY presence", () => {
+  assert.equal(resolveColor("auto", true), true)
+  assert.equal(resolveColor("auto", false), false)
+  assert.equal(resolveColor("always", false), true)
+  assert.equal(resolveColor("never", true), false)
 })

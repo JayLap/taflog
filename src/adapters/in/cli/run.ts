@@ -32,7 +32,7 @@ import {
 } from "./present.ts"
 import { logJson, renderLog } from "./present-log.ts"
 import { renderReport, reportJson } from "./present-report.ts"
-import { createStyle, resolveColor, resolveIcons } from "./style.ts"
+import { createStyle, resolveColor } from "./style.ts"
 import type { Intake } from "./intake.ts"
 
 /** Everything the CLI needs, injected by the composition root (ADR-0005). */
@@ -56,8 +56,7 @@ export interface CliDeps {
   version: string
   stdout: (chunk: string) => void
   stderr: (chunk: string) => void
-  /** Presentation environment; defaults keep tests terminal-free. */
-  env?: NodeJS.ProcessEnv
+  /** stdout is a terminal; defaults keep tests terminal-free. */
   isTTY?: boolean
   columns?: number
 }
@@ -122,15 +121,9 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
     return 0
   }
 
-  const env = deps.env ?? process.env
   const style = createStyle({
-    icons: resolveIcons(parsed.options.icons, env, deps.config.icons.value),
-    color: resolveColor(
-      parsed.options.noColor,
-      env,
-      deps.isTTY === true,
-      deps.config.color.value,
-    ),
+    icons: deps.config.icons.value,
+    color: resolveColor(deps.config.color.value, deps.isTTY === true),
     width: deps.columns ?? Number.POSITIVE_INFINITY,
   })
 

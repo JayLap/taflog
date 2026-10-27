@@ -100,7 +100,6 @@ async function main(): Promise<number> {
     version: version(),
     stdout: (chunk) => process.stdout.write(chunk),
     stderr: (chunk) => process.stderr.write(chunk),
-    env,
     isTTY: process.stdout.isTTY === true,
     columns: process.stdout.columns,
   })
