@@ -12,6 +12,8 @@ export interface StopInput {
   description?: string
   /** Optional local wall-clock time, e.g. `15h44` (SPEC §6, §8.5). */
   time?: string
+  /** Optional date for `time`; defaults to today (SPEC §8.5). */
+  date?: string
   force?: boolean
 }
 
@@ -48,7 +50,7 @@ export class StopTask {
     }
 
     const now = this.clock.now()
-    const at = resolveEffectiveInstant("stop", input.time, now)
+    const at = resolveEffectiveInstant("stop", input.time, input.date, now)
     assertAfterTimerStart("stop", at, running.start)
     if (input.force !== true && isForgotten(running, at, this.maxTimerHours)) {
       throw new ForgottenTimerError(running.project, running.start, this.maxTimerHours)

@@ -79,6 +79,38 @@ test("StopTask closes the Timer at an explicit time", async () => {
   assert.equal(log.events[1]?.at, expected.toISOString())
 })
 
+test("StopTask closes at an explicit date and time", async () => {
+  const clock = new FakeClock("2025-10-22T09:00:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T18:00:00")
+  const result = await new StopTask(clock, log).execute({
+    time: "17:00",
+    date: "yesterday",
+  })
+
+  const expected = new Date(2025, 9, 22, 17, 0)
+  assert.equal(result.entry.end.getTime(), expected.getTime())
+  assert.equal(result.event.at, expected.toISOString())
+})
+
+test("StopTask requires a time with --date and rejects an invalid date", async () => {
+  const clock = new FakeClock("2025-10-23T09:12:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T10:00:00")
+
+  await assert.rejects(
+    () => new StopTask(clock, log).execute({ date: "yesterday" }),
+    (error: unknown) => error instanceof UsageError && /--date requires a time/.test(error.message),
+  )
+  await assert.rejects(
+    () => new StopTask(clock, log).execute({ time: "09:30", date: "nope" }),
+    (error: unknown) => error instanceof UsageError && /invalid date/.test(error.message),
+  )
+  assert.equal(log.events.length, 1)
+})
+
 test("StopTask rejects a future or pre-start explicit time", async () => {
   const clock = new FakeClock("2025-10-23T09:12:00")
   const log = new InMemoryEventLog()

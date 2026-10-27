@@ -148,11 +148,11 @@ shows them; `rm` accepts a full id or an unambiguous prefix.
   effective end, not wall-clock now.
 - **Explicit stop/switch time**: `stop [<time>]` and
   `switch <project> [<time>]` accept a local wall-clock time (`9:00`,
-  `09:00`, `15h44`, `15h`). It always falls on today's local date and becomes
-  the Event's `at`, closing the Entry and, for `switch`, opening the next
-  Timer. Times in the future or before the open Timer's opening instant are
-  usage errors; `switch` with a time while idle is refused. `--date` is not
-  supported by `stop` or `switch`.
+  `09:00`, `15h44`, `15h`). It defaults to today's local date; `--date`
+  selects another local date and requires a `<time>`. It becomes the Event's
+  `at`, closing the Entry and, for `switch`, opening the next Timer. Times in
+  the future or before the open Timer's opening instant are usage errors;
+  `switch` with a time while idle is refused.
 
 ## 7. Configuration
 
@@ -184,8 +184,8 @@ merge-writes. For `--json`, `taflog config` emits
 | Command | Purpose |
 |---------|---------|
 | `start <project> [description]` | Open a Timer; no operands prompts on a TTY |
-| `stop [<time>] [description]` | Close the Timer, optionally at an explicit time and/or setting its Description |
-| `switch <project> [<time>] [description]` | Close and open atomically, optionally at an explicit time; no operands prompts on a TTY |
+| `stop [<time>] [description] [--date D]` | Close the Timer, optionally at an explicit date/time and/or setting its Description |
+| `switch <project> [<time>] [description] [--date D]` | Close and open atomically, optionally at an explicit date/time; no operands prompts on a TTY |
 | `status` | Current snapshot; also the default with no arguments |
 | `log [filters]` | List Entries and Adjustments |
 | `report [filters]` | Aggregate Timed and Adjusted time |
@@ -227,8 +227,8 @@ exit 2.
 - **Dates** (`--date`, `--from`, `--to`): `YYYY-MM-DD`, `today`, `yesterday`,
   and weekday names (`mon`…`sun`) within the current week.
 - **Times** (`stop`, `switch`): `9:00`, `09:00`, `15h44`, `15h`, `9h`;
-  minutes default to `00`. They are always resolved on today's local date.
-  `--date` is a usage error on these commands.
+  minutes default to `00`. They default to today's local date; `--date`
+  selects another date and is a usage error without a `<time>`.
 - **Projects**: stored verbatim (trimmed); filtering is case-insensitive.
 - **Descriptions**: the trailing argument(s), stored verbatim.
 
@@ -385,8 +385,11 @@ never parsed. This is the machine API for the Log's source of truth.
 | `stop` while idle | Error, exit 1: `nothing is running` |
 | `stop [description]` | Closes the Timer, optionally setting its Description |
 | `stop <time> [description]` | Closes the Timer at today's local wall-clock time |
+| `stop <time> --date D` | Closes the Timer at the given local date and time |
 | `switch <project> <time> [description]` | Closes and reopens at today's local wall-clock time |
+| `switch <project> <time> --date D` | Closes and reopens at the given local date and time |
 | `switch <time>` while idle | Refused: `switch cannot take a time while no Timer is running — use start` |
+| `--date` without `<time>` | Refused: usage error, exit 2 |
 | explicit time in the future | Refused: usage error, exit 2 |
 | explicit time before the Timer's opening instant | Refused: usage error, exit 2 |
 | `add` / `sub` while running | Allowed; Adjustments are independent of the Timer |
@@ -411,8 +414,7 @@ never parsed. This is the machine API for the Log's source of truth.
 ## 12. Non-goals and deferred
 
 Yearly log rotation, `compact`, tags, field-level `edit`, natural-language
-dates, `--from`/`--to` month names, backdated stop/switch dates beyond today
-(`--date` on `stop`/`switch`), sync/multi-device, shell completions,
+dates, `--from`/`--to` month names, sync/multi-device, shell completions,
 interactive prompts beyond `start`/`switch`/`add`/`sub`, `init` wizard,
 localization, and any Windows-specific incantations beyond the per-OS
 directories in §5. Command surface is English-only in v1.

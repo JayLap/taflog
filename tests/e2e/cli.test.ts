@@ -456,22 +456,34 @@ test("exit codes follow SPEC §8.4 and errors are prefixed", () => {
   })
 })
 
-function localMidnight(): Date {
+function localDay(offset = 0): Date {
   const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
 }
 
-function seedStartToday(dir: string, project: string): void {
+function localDateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+function localMidnight(): Date {
+  return localDay()
+}
+
+function seedStartAt(dir: string, project: string, at: Date): void {
   appendFileSync(
     join(dir, "events.ndjson"),
     `${JSON.stringify({
       v: 1,
       id: "today001",
       t: "start",
-      at: localMidnight().toISOString(),
+      at: at.toISOString(),
       project,
     })}\n`,
   )
+}
+
+function seedStartToday(dir: string, project: string): void {
+  seedStartAt(dir, project, localMidnight())
 }
 
 test("stop accepts an explicit local time", () => {
@@ -514,11 +526,46 @@ test("switch with a time while idle is refused", () => {
   })
 })
 
-test("stop and switch reject --date", () => {
+test("stop and switch accept an explicit date", () => {
+  withTempDir((dir) => {
+    const yesterday = localDay(-1)
+    seedStartAt(dir, "acme", yesterday)
+    assert.equal(run(dir, ["stop", "00:00", "--date", "yesterday"]).status, 0)
+
+    const stopped = readEvents(dir)[1]
+    assert.equal(stopped?.t, "stop")
+    assert.equal(stopped?.at, yesterday.toISOString())
+  })
+
+  withTempDir((dir) => {
+    const yesterday = localDay(-1)
+    seedStartAt(dir, "acme", yesterday)
+    assert.equal(
+      run(dir, ["switch", "beta", "00:00", "--date", localDateString(yesterday)]).status,
+      0,
+    )
+
+    const switched = readEvents(dir)[1]
+    assert.equal(switched?.t, "switch")
+    assert.equal(switched?.at, yesterday.toISOString())
+    assert.equal(switched?.project, "beta")
+  })
+})
+
+test("stop and switch reject --date without a time", () => {
   withTempDir((dir) => {
     seedStartToday(dir, "acme")
-    assert.equal(run(dir, ["stop", "00:00", "--date", "today"]).status, 2)
-    assert.equal(run(dir, ["switch", "beta", "00:00", "--date", "today"]).status, 2)
+    assert.equal(run(dir, ["stop", "--date", "yesterday"]).status, 2)
+    assert.equal(run(dir, ["switch", "beta", "--date", "yesterday"]).status, 2)
+  })
+})
+
+test("an invalid date for an explicit time is a usage error", () => {
+  withTempDir((dir) => {
+    seedStartToday(dir, "acme")
+    const result = run(dir, ["stop", "00:00", "--date", "nope"])
+    assert.equal(result.status, 2)
+    assert.match(result.stderr, /invalid date/)
   })
 })
 

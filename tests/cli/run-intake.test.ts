@@ -124,13 +124,46 @@ test("stop with an explicit time dispatches the parsed time", async () => {
   assert.equal(log.events[1]?.at, new Date(2025, 9, 23, 9, 5).toISOString())
 })
 
-test("stop and switch reject --date", async () => {
-  const log = new InMemoryEventLog()
+test("stop with an explicit date dispatches the resolved date", async () => {
+  const log = new InMemoryEventLog([
+    {
+      v: 1,
+      id: "aaaaaaa1",
+      t: "start",
+      at: new Date(2025, 9, 22, 9, 0).toISOString(),
+      project: "acme",
+    },
+  ])
   const fixture = deps(log, fakeIntake({}))
+  const code = await runCli(parseArgs(["stop", "09:05", "--date", "yesterday"]), fixture.deps)
 
-  assert.equal(await runCli(parseArgs(["stop", "09:05", "--date", "today"]), fixture.deps), 2)
-  assert.equal(await runCli(parseArgs(["switch", "beta", "--date", "today"]), fixture.deps), 2)
-  assert.equal(log.events.length, 0)
+  assert.equal(code, 0)
+  assert.equal(log.events[1]?.t, "stop")
+  assert.equal(log.events[1]?.at, new Date(2025, 9, 22, 9, 5).toISOString())
+})
+
+test("stop and switch reject --date without a time", async () => {
+  const log = new InMemoryEventLog([
+    {
+      v: 1,
+      id: "aaaaaaa1",
+      t: "start",
+      at: new Date(2025, 9, 23, 9, 0).toISOString(),
+      project: "acme",
+    },
+  ])
+  const fixture = deps(log, fakeIntake({ timer: { project: "beta" } }))
+
+  assert.equal(await runCli(parseArgs(["stop", "--date", "yesterday"]), fixture.deps), 2)
+  assert.equal(
+    await runCli(parseArgs(["switch", "beta", "--date", "yesterday"]), fixture.deps),
+    2,
+  )
+  assert.equal(
+    await runCli(parseArgs(["switch", "--date", "yesterday"]), fixture.deps),
+    2,
+  )
+  assert.equal(log.events.length, 1)
 })
 
 test("cancelling the intake writes no Event and exits 130", async () => {

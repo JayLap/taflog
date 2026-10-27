@@ -77,8 +77,9 @@ _Avoid_: net time
 
 **Explicit time**:
 The optional local wall-clock time given to `stop` or `switch` (`15h44`,
-`9:00`). It resolves on today's local date and becomes the Event's `at`, so it
-closes the Entry and, for `switch`, opens the next Timer at that instant.
+`9:00`), together with an optional `--date`. It resolves on today's local date
+by default and becomes the Event's `at`, so it closes the Entry and, for
+`switch`, opens the next Timer at that instant.
 _Avoid_: backdate, fake time, manual timestamp
 
 **Week**:

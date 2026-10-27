@@ -142,3 +142,44 @@ test("SwitchTask applies the forgotten limit to the explicit end", async () => {
     (error: unknown) => error instanceof ForgottenTimerError,
   )
 })
+
+test("SwitchTask switches at an explicit date and time", async () => {
+  const clock = new FakeClock("2025-10-22T09:00:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T13:00:00")
+  const result = await new SwitchTask(clock, log).execute({
+    project: "beta",
+    time: "17:00",
+    date: "yesterday",
+  })
+
+  const expected = new Date(2025, 9, 22, 17, 0)
+  assert.equal(result.closed?.end.getTime(), expected.getTime())
+  assert.equal(result.timer.start.getTime(), expected.getTime())
+  assert.equal(result.event.at, expected.toISOString())
+})
+
+test("SwitchTask requires a time with --date", async () => {
+  const clock = new FakeClock("2025-10-23T09:12:00")
+  const log = new InMemoryEventLog()
+  await new StartTask(clock, log).execute({ project: "acme" })
+  clock.set("2025-10-23T10:00:00")
+
+  await assert.rejects(
+    () => new SwitchTask(clock, log).execute({ project: "beta", date: "yesterday" }),
+    (error: unknown) => error instanceof UsageError && /--date requires a time/.test(error.message),
+  )
+  assert.equal(log.events.length, 1)
+})
+
+test("SwitchTask rejects --date without a time while idle", async () => {
+  const clock = new FakeClock("2025-10-23T09:12:00")
+  const log = new InMemoryEventLog()
+
+  await assert.rejects(
+    () => new SwitchTask(clock, log).execute({ project: "beta", date: "yesterday" }),
+    (error: unknown) => error instanceof UsageError && /--date requires a time/.test(error.message),
+  )
+  assert.equal(log.events.length, 0)
+})

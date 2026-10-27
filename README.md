@@ -35,8 +35,8 @@ command and flag.
 | Command | Purpose |
 |---------|---------|
 | `start <project> [description]` | Open a timer |
-| `stop [<time>] [description]` | Close the running timer, optionally at a time |
-| `switch <project> [<time>] [description]` | Close and open a new timer in one step, optionally at a time |
+| `stop [<time>] [description] [--date D]` | Close the running timer, optionally at a date/time |
+| `switch <project> [<time>] [description] [--date D]` | Close and open a new timer in one step, optionally at a date/time |
 | `status` | What's running, plus today's total |
 | `log [filters]` | List entries and adjustments |
 | `report [filters]` | Time by project or by day |
@@ -68,12 +68,16 @@ time, and `switch` starts the next timer at the same instant:
 ```console
 $ taflog stop 15h44
 $ taflog stop 9:00 "finished the parser fix"
+$ taflog stop 17:00 --date yesterday
 $ taflog switch beta 13:15 "answering emails"
+$ taflog switch beta 13:15 --date 2025-10-22
 ```
 
-Times accept `9:00`, `09:00`, `15h44`, `15h`, and always mean today. Times in
-the future or before the running timer started are rejected, and `switch` with
-a time is refused while idle. `--date` is not supported by `stop` or `switch`.
+Times accept `9:00`, `09:00`, `15h44`, and `15h`, and default to today.
+`--date` accepts the same forms as elsewhere (`YYYY-MM-DD`, `today`,
+`yesterday`, or a weekday name) and requires a time. Times in the future or
+before the running timer started are rejected, and `switch` with a time is
+refused while idle.
 
 ### Interactive commands
 

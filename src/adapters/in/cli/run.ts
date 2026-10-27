@@ -90,7 +90,8 @@ Filters:
 
 Time (stop/switch):
   <time>                      local wall-clock time, e.g. 9:00, 15h44, 15h
-                              (always today; stop/switch do not accept --date)
+  --date <date>               date for <time>, e.g. yesterday or 2025-10-23
+                              (defaults to today; requires a <time>)
 
 Global flags:
   --dir <path>              data directory
@@ -149,10 +150,10 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "stop": {
-        rejectDate(parsed, "stop")
         const input = splitStopOperands(parsed.operands)
         const result = await deps.stopTask.execute({
           ...input,
+          ...(parsed.options.date === null ? {} : { date: parsed.options.date }),
           ...(parsed.options.force ? { force: true } : {}),
         })
         warnSkipped(result.skipped, deps)
@@ -160,11 +161,14 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "switch": {
-        rejectDate(parsed, "switch")
+        if (parsed.options.date !== null && parsed.operands.length === 0) {
+          throw new UsageError("--date requires a time on switch")
+        }
         const input = await deps.intake.timer(parsed, "switch")
         if (input === null) return 130
         const result = await deps.switchTask.execute({
           ...input,
+          ...(parsed.options.date === null ? {} : { date: parsed.options.date }),
           ...(parsed.options.force ? { force: true } : {}),
         })
         warnSkipped(result.skipped, deps)
@@ -304,13 +308,6 @@ function splitStopOperands(parts: string[]): { time?: string; description?: stri
   }
   const description = joinOperands(parts)
   return description === undefined ? {} : { description }
-}
-
-/** `stop`/`switch` times are always today; a date flag would be silently wrong. */
-function rejectDate(parsed: ParsedArgs, command: "stop" | "switch"): void {
-  if (parsed.options.date !== null) {
-    throw new UsageError(`--date is not supported by ${command}`)
-  }
 }
 
 function warnSkipped(skipped: number, deps: CliDeps): void {

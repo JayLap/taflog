@@ -13,6 +13,8 @@ export interface SwitchInput {
   description?: string
   /** Optional local wall-clock time, e.g. `15h44` (SPEC §6, §8.5). */
   time?: string
+  /** Optional date for `time`; defaults to today (SPEC §8.5). */
+  date?: string
   force?: boolean
 }
 
@@ -61,6 +63,9 @@ export class SwitchTask {
       if (input.time !== undefined) {
         throw new UsageError("switch cannot take a time while no Timer is running — use start")
       }
+      if (input.date !== undefined) {
+        throw new UsageError("--date requires a time on switch")
+      }
       const event: StartEvent = {
         v: 1,
         id: this.generateId(),
@@ -79,7 +84,7 @@ export class SwitchTask {
       return { skipped, event, closed: null, timer }
     }
 
-    const at = resolveEffectiveInstant("switch", input.time, now)
+    const at = resolveEffectiveInstant("switch", input.time, input.date, now)
     assertAfterTimerStart("switch", at, running.start)
     if (input.force !== true && isForgotten(running, at, this.maxTimerHours)) {
       throw new ForgottenTimerError(running.project, running.start, this.maxTimerHours)
