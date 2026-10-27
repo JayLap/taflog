@@ -164,3 +164,16 @@ test("renderRemoved names the removed Entry or Adjustment", () => {
   }
   assert.equal(renderRemoved(removedAdjustment), "○ removed adjustment −30m beta\n")
 })
+
+test("renderStatus strips terminal control sequences from Log text", () => {
+  const result: StatusResult = {
+    skipped: 0,
+    now: new Date(2025, 9, 23, 9, 36),
+    timer: timer("ac\u001b[31me", "wait\u0007ing", new Date(2025, 9, 23, 9, 12)),
+    lastEntry: null,
+    today: { timedSeconds: 0, adjustedSeconds: 0, totalSeconds: 0 },
+  }
+  const text = renderStatus(result)
+  assert.doesNotMatch(text, /\u001b|\u0007/)
+  assert.match(text.split("\n")[0] ?? "", /^● ac\[31me — waiting$/)
+})

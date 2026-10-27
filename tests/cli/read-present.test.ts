@@ -301,3 +301,31 @@ test("ascii icons keep negative report durations ASCII", () => {
   assert.doesNotMatch(summary, /−/)
   assert.match(summary, /-30m/)
 })
+
+test("terminal presenters strip control sequences while JSON keeps them raw", () => {
+  const result = logResult()
+  result.items[0] = {
+    ...result.items[0]!,
+    project: "ac\u001b[31mme",
+    description: "rev\u0007iew",
+  }
+  const text = renderLog(result, { style: createStyle() })
+  assert.doesNotMatch(text, /\u001b|\u0007/)
+  assert.match(text, /ac\[31mme/)
+  assert.match(text, /review/)
+  assert.equal(
+    (JSON.parse(logJson(result)) as { entries: Array<{ project: string }> }).entries[0]!.project,
+    "ac\u001b[31mme",
+  )
+
+  const report = reportResult()
+  report.report.byProject[0]!.project = "ac\u001b[31mme"
+  report.report.byProject[0]!.details[0]!.description = "rev\u0007iew"
+  const grid = renderReport(report, { style: createStyle(), grid: true, details: true })
+  assert.doesNotMatch(grid, /\u001b|\u0007/)
+  assert.match(grid, /ac\[31mme/)
+  assert.match(grid, /review/)
+  const summary = renderReport(report, { style: createStyle() })
+  assert.doesNotMatch(summary, /\u001b|\u0007/)
+  assert.match(summary, /ac\[31mme/)
+})

@@ -4,7 +4,7 @@ import {
   type Resolved,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
-import { createStyle, type Style } from "./style.ts"
+import { createStyle, sanitizeForTerminal, type Style } from "./style.ts"
 
 export interface RenderConfigOptions {
   style?: Style
@@ -20,12 +20,12 @@ export interface RenderConfigOptions {
 export function renderConfig(view: ResolvedConfig, options: RenderConfigOptions = {}): string {
   const style = options.style ?? createStyle()
   if (options.key !== undefined) {
-    return `${String(view[options.key].value)}\n`
+    return `${sanitizeForTerminal(String(view[options.key].value))}\n`
   }
 
   const rows = CONFIG_KEYS.map((key) => ({
     key,
-    value: String(view[key].value),
+    value: sanitizeForTerminal(String(view[key].value)),
     source: view[key].source,
   }))
   const keyWidth = Math.max(...rows.map((row) => row.key.length))
@@ -70,5 +70,5 @@ export function configJson(view: ResolvedConfig, options: ConfigJsonOptions = {}
 
 /** Confirmation for `set`: the canonical key and the value written. */
 export function renderSet(result: { key: string; value: string | number }): string {
-  return `${result.key} = ${String(result.value)}\n`
+  return `${result.key} = ${sanitizeForTerminal(String(result.value))}\n`
 }

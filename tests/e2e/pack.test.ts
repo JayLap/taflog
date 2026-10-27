@@ -64,6 +64,15 @@ test("the packed tarball installs globally and the installed CLI runs", { timeou
     assert.ok(paths.every((path) => !path.startsWith("src/")), "tarball excludes src/")
     assert.ok(paths.every((path) => !path.startsWith("tests/")), "tarball excludes tests/")
 
+    // `tsc` leaves removed outputs behind; a stale module must not ship.
+    for (const path of paths.filter((path) => path.startsWith("dist/") && path.endsWith(".js"))) {
+      const source = join(root, path.replace(/^dist\//, "src/").replace(/\.js$/, ".ts"))
+      assert.ok(
+        existsSync(source),
+        `tarball module ${path} has no matching source (stale dist output)`,
+      )
+    }
+
     const tarball = join(packDir, info.filename)
     assert.ok(existsSync(tarball))
 

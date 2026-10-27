@@ -3,6 +3,7 @@ import type { Readable, Writable } from "node:stream"
 import type { LogCandidates } from "../../../application/log-candidates.ts"
 import { UsageError } from "../../../application/errors.ts"
 import type { ParsedArgs } from "./args.ts"
+import { sanitizeForTerminal } from "./style.ts"
 
 /** A Timer's opening input, gathered from operands or a prompt. */
 export interface TimerDraft {
@@ -104,7 +105,7 @@ class TerminalIntake implements Intake {
     if (project === null) return null
 
     prompt.setCandidates(
-      (await this.logCandidates.execute({ kind: "description", project })).candidates,
+      safeCandidates((await this.logCandidates.execute({ kind: "description", project })).candidates),
     )
     const answer = await prompt.ask("Description (optional): ")
     if (answer === null) return null
@@ -129,7 +130,7 @@ class TerminalIntake implements Intake {
 
 /** Ask for a non-blank Project, with Projects as Tab candidates. */
 async function askProject(prompt: LinePrompt, logCandidates: LogCandidates): Promise<string | null> {
-  prompt.setCandidates((await logCandidates.execute({ kind: "project" })).candidates)
+  prompt.setCandidates(safeCandidates((await logCandidates.execute({ kind: "project" })).candidates))
   let project = ""
   while (project === "") {
     const answer = await prompt.ask("Project: ")
@@ -142,6 +143,11 @@ async function askProject(prompt: LinePrompt, logCandidates: LogCandidates): Pro
 function join(parts: string[]): string | undefined {
   const text = parts.join(" ").trim()
   return text === "" ? undefined : text
+}
+
+/** Log-derived candidates can carry terminal controls; strip them before readline. */
+function safeCandidates(candidates: string[]): string[] {
+  return candidates.map(sanitizeForTerminal).filter((candidate) => candidate !== "")
 }
 
 /** One readline session whose completer candidates can change between prompts. */

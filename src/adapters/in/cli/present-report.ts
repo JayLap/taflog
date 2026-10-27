@@ -6,7 +6,7 @@ import {
   isWeekend,
 } from "../../../domain/datetime.ts"
 import { rangeTitle } from "./range-title.ts"
-import { createStyle, type Style } from "./style.ts"
+import { createStyle, sanitizeForTerminal, type Style } from "./style.ts"
 
 export interface ReportRenderOptions {
   style?: Style
@@ -40,16 +40,20 @@ export function renderReport(result: BuildReportResult, options: ReportRenderOpt
 }
 
 function renderSummary(projects: ReportProject[], style: Style): string[] {
-  const projectWidth = Math.max(...projects.map((project) => project.project.length))
+  const names = projects.map((project) => sanitizeForTerminal(project.project))
+  const projectWidth = Math.max(...names.map((name) => name.length))
   const totalWidth = Math.max(...projects.map((project) => style.duration(project.totalSeconds).length))
   const timedWidth = Math.max(...projects.map((project) => style.duration(project.timedSeconds).length))
 
-  return projects.map((project) => {
-    let line = `  ${project.project.padEnd(projectWidth)}   ${style.duration(project.totalSeconds).padStart(totalWidth)}    timed ${style.duration(project.timedSeconds).padStart(timedWidth)}`
+  return projects.map((project, index) => {
+    const name = names[index]!
+    let line = `  ${name.padEnd(projectWidth)}   ${style.duration(project.totalSeconds).padStart(totalWidth)}    timed ${style.duration(project.timedSeconds).padStart(timedWidth)}`
     if (project.adjustedSeconds !== 0) {
       line += ` ${style.glyphs.project} adjusted ${style.signed(project.adjustedSeconds)}`
     }
-    return line.replace(project.project, style.project(project.project))
+    // A function replacer keeps `$&`/`$'` in a Project name from being read as
+    // replacement patterns.
+    return line.replace(name, () => style.project(name))
   })
 }
 
@@ -71,14 +75,16 @@ function renderGrid(
   let grandTotal = 0
   for (const project of report.byProject) {
     grandTotal += project.totalSeconds
+    const name = sanitizeForTerminal(project.project)
     const cells = columns
       .map((column) => pad(gridDuration(dayProjectTotal(column.day, project.project), style)))
       .join("")
-    const row = `${label(`  ${project.project}`)}${cells}${pad(gridDuration(project.totalSeconds, style))}`.trimEnd()
-    lines.push(row.replace(project.project, style.project(project.project)))
+    const row = `${label(`  ${name}`)}${cells}${pad(gridDuration(project.totalSeconds, style))}`.trimEnd()
+    lines.push(row.replace(name, () => style.project(name)))
 
     if (details) {
       for (const detail of project.details) {
+        const description = sanitizeForTerminal(detail.description)
         const cells = columns
           .map((column) => {
             const timed = detail.byDay.find((item) => item.date === column.date)?.timedSeconds ?? 0
@@ -86,7 +92,7 @@ function renderGrid(
           })
           .join("")
         lines.push(
-          `${label(`    ${detail.description}`)}${cells}${pad(gridDuration(detail.totalSeconds, style))}`.trimEnd(),
+          `${label(`    ${description}`)}${cells}${pad(gridDuration(detail.totalSeconds, style))}`.trimEnd(),
         )
       }
 
@@ -120,9 +126,9 @@ function renderGrid(
 function gridLabels(report: Report, details: boolean): string[] {
   const labels: string[] = []
   for (const project of report.byProject) {
-    labels.push(`  ${project.project}`)
+    labels.push(`  ${sanitizeForTerminal(project.project)}`)
     if (details) {
-      for (const detail of project.details) labels.push(`    ${detail.description}`)
+      for (const detail of project.details) labels.push(`    ${sanitizeForTerminal(detail.description)}`)
       if (project.adjustmentDays.length > 0) labels.push("    adjustments")
     }
   }

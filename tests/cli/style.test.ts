@@ -1,6 +1,11 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { createStyle, resolveColor, truncate } from "../../src/adapters/in/cli/style.ts"
+import {
+  createStyle,
+  resolveColor,
+  sanitizeForTerminal,
+  truncate,
+} from "../../src/adapters/in/cli/style.ts"
 
 test("the default Style is plain, auto-glyph, and untruncated", () => {
   const style = createStyle()
@@ -50,4 +55,13 @@ test("resolveColor reduces the resolved policy against TTY presence", () => {
   assert.equal(resolveColor("auto", false), false)
   assert.equal(resolveColor("always", false), true)
   assert.equal(resolveColor("never", true), false)
+})
+
+test("sanitizeForTerminal strips control and bidi characters", () => {
+  assert.equal(sanitizeForTerminal("acme"), "acme")
+  assert.equal(sanitizeForTerminal("ac\u001b[31mme"), "ac[31mme")
+  assert.equal(sanitizeForTerminal("a\u0007b\u0000c\u007fd\u009be"), "abcde")
+  assert.equal(sanitizeForTerminal("a\u202eb"), "ab")
+  assert.equal(sanitizeForTerminal("a\u200fb"), "ab")
+  assert.equal(sanitizeForTerminal("new parser"), "new parser")
 })

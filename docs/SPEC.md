@@ -318,7 +318,10 @@ time.
 Colour is disabled by `--no-color`, `NO_COLOR`, `color: "never"`, or a
 non-TTY. Project names are accented, durations right-aligned, metadata dim,
 running green, `+` yellow, `−` red. Descriptions truncate with `…` to terminal
-width and never wrap. Empty state prints a one-line hint.
+width and never wrap. Empty state prints a one-line hint. Log- and
+config-supplied text is stripped of terminal control characters (C0/C1, DEL,
+and bidi/invisible marks) before it is written to the terminal; `--json` and
+`export` keep the raw values.
 
 ### 9.5 `--json` (version 1)
 

@@ -173,3 +173,26 @@ test("adjustment re-prompts when the Duration is blank", async () => {
     duration: "1h30m",
   })
 })
+
+test("completion candidates are stripped of terminal control sequences", async () => {
+  const input = new PassThrough()
+  const output = new PassThrough()
+  const chunks: Buffer[] = []
+  output.on("data", (chunk: Buffer) => chunks.push(chunk))
+  const intake = createIntake({
+    logCandidates: {
+      execute: async () => ({ candidates: ["ac\u001b[31mme"] }),
+    } as unknown as LogCandidates,
+    input,
+    output,
+    isTTY: true,
+    isInputTTY: true,
+  })
+  const pending = intake.timer(parseArgs(["start"]), "start")
+  setTimeout(() => input.write("ac\t"), 20)
+  setTimeout(() => input.write("\u0003"), 60)
+  assert.equal(await pending, null)
+  const text = Buffer.concat(chunks).toString("binary")
+  assert.ok(!text.includes("\u001b[31m"), "candidate escape leaked to readline")
+  assert.match(text, /ac\[31mme/)
+})

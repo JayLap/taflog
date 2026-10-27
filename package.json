@@ -10,7 +10,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "typecheck": "tsc --noEmit",
     "start": "node src/main.ts",
     "pretest": "npm run build",

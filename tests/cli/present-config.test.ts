@@ -40,3 +40,16 @@ test("configJson is the version-1 shape with sources", () => {
 test("renderSet confirms the written key", () => {
   assert.equal(renderSet({ key: "icons", value: "nerd" }), "icons = nerd\n")
 })
+
+test("renderConfig strips control sequences from values but JSON keeps them raw", () => {
+  const dirty: ResolvedConfig = {
+    ...view,
+    dir: { value: "/data/\u001b[31mtaflog", source: "file" },
+  }
+  assert.equal(renderConfig(dirty, { key: "dir" }), "/data/[31mtaflog\n")
+  assert.doesNotMatch(renderConfig(dirty), /\u001b/)
+  assert.equal(
+    (JSON.parse(configJson(dirty)) as { config: { dir: { value: string } } }).config.dir.value,
+    "/data/\u001b[31mtaflog",
+  )
+})

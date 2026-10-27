@@ -1,7 +1,7 @@
 import type { LogItem, QueryLogResult } from "../../../application/query-log.ts"
 import { formatLocalTime } from "../../../domain/datetime.ts"
 import { rangeTitle } from "./range-title.ts"
-import { createStyle, type Style } from "./style.ts"
+import { createStyle, sanitizeForTerminal, type Style } from "./style.ts"
 
 export interface LogRenderOptions {
   style?: Style
@@ -57,12 +57,14 @@ function renderItem(
 }
 
 function projectLabel(item: LogItem, ids: boolean): string {
-  return ids ? `${item.project} ${item.id}` : item.project
+  const project = sanitizeForTerminal(item.project)
+  return ids ? `${project} ${sanitizeForTerminal(item.id)}` : project
 }
 
 function describe(item: LogItem, style: Style): string {
-  if (item.kind === "timed") return item.description
-  const note = item.note === undefined ? "" : ` ${style.glyphs.project} ${item.note}`
+  if (item.kind === "timed") return sanitizeForTerminal(item.description)
+  const note =
+    item.note === undefined ? "" : ` ${style.glyphs.project} ${sanitizeForTerminal(item.note)}`
   return `adjustment${note}`
 }
 

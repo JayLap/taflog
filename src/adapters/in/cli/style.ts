@@ -109,6 +109,19 @@ export function createStyle(options: StyleOptions = {}): Style {
   }
 }
 
+/**
+ * Remove characters a terminal could act on as a control sequence, or use to
+ * spoof what is shown: C0/C1 controls and DEL, plus bidi overrides/isolates and
+ * invisible marks. Applied to Log- and config-supplied text before it reaches
+ * the terminal; `--json` and `export` keep the raw values (SPEC §9.5).
+ */
+export function sanitizeForTerminal(text: string): string {
+  return text.replace(
+    /[\u0000-\u001F\u007F-\u009F\u061C\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069]/g,
+    "",
+  )
+}
+
 /** Truncate plain text to `max` cells with a single `…`; never wraps. */
 export function truncate(text: string, max: number): string {
   if (!Number.isFinite(max) || max <= 0) return text
