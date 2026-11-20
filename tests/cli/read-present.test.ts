@@ -329,3 +329,17 @@ test("terminal presenters strip control sequences while JSON keeps them raw", ()
   assert.doesNotMatch(summary, /\u001b|\u0007/)
   assert.match(summary, /ac\[31mme/)
 })
+
+test("a normalized report says so in its header, and JSON carries the normalization", () => {
+  const result = reportResult()
+  result.report.normalization = {
+    stepSeconds: 900,
+    days: [{ date: "2025-10-20", targetSeconds: 27000, originalSeconds: 9000, normalizedSeconds: 27000 }],
+  }
+  const text = renderReport(result, { style: createStyle(), grid: true, details: true })
+  assert.match(text.split("\n")[0] ?? "", /^Week 43 · .* · normalized$/)
+
+  const parsed = JSON.parse(reportJson(result))
+  assert.deepEqual(parsed.normalization, result.report.normalization)
+  assert.equal("normalization" in JSON.parse(reportJson(reportResult())), false)
+})

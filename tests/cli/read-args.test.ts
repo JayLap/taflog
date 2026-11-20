@@ -59,3 +59,8 @@ test("read-command flags with no value are usage errors", () => {
   assert.throws(() => parseArgs(["log", "--limit"]), UsageError)
   assert.throws(() => parseArgs(["report", "--by"]), UsageError)
 })
+
+test("--normalize is a boolean that defaults to off", () => {
+  assert.equal(parseArgs(["report"]).options.normalize, false)
+  assert.equal(parseArgs(["report", "--details", "--normalize"]).options.normalize, true)
+})

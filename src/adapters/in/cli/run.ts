@@ -13,7 +13,8 @@ import {
   type ConfigKey,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
-import { looksLikeTimeOfDay, type WeekStart } from "../../../domain/datetime.ts"
+import { looksLikeTimeOfDay, WEEKDAYS, type WeekStart } from "../../../domain/datetime.ts"
+import type { DayTargets } from "../../../domain/normalize.ts"
 import { TaflogError } from "../../../domain/errors.ts"
 import type { ParsedArgs } from "./args.ts"
 import {
@@ -85,6 +86,7 @@ Filters:
   --limit <n>                 newest entries (log)
   --by <project|day>          report grouping
   --details                   add Description sub-rows to the report grid
+  --normalize                 rescale completed days to their configured day target
   --ids                       show Entry/Adjustment identities (log)
   --seconds                   show seconds on log durations
 
@@ -212,7 +214,10 @@ export async function runCli(parsed: ParsedArgs, deps: CliDeps): Promise<number>
         return 0
       }
       case "report": {
-        const result = await deps.buildReport.execute(rangeInput(parsed, deps.config.weekStart.value))
+        const result = await deps.buildReport.execute({
+          ...rangeInput(parsed, deps.config.weekStart.value),
+          ...(parsed.options.normalize ? { normalize: normalizeInput(deps.config) } : {}),
+        })
         warnSkipped(result.skipped, deps)
         deps.stdout(
           parsed.options.json
@@ -292,6 +297,14 @@ function rangeInput(
     ...(parsed.options.limit === null ? {} : { limit: parsed.options.limit }),
     weekStart,
   }
+}
+
+/** The day targets and rounding step `--normalize` needs, from configuration. */
+function normalizeInput(config: ResolvedConfig): { dayTargets: DayTargets; step: number } {
+  const dayTargets = Object.fromEntries(
+    WEEKDAYS.map((weekday) => [weekday, config.dayTargets[weekday].value]),
+  ) as DayTargets
+  return { dayTargets, step: config.reportStep.value }
 }
 
 function joinOperands(parts: string[]): string | undefined {

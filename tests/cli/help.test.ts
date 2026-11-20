@@ -54,3 +54,9 @@ test("usage points at the project docs", () => {
     assert.ok(USAGE.includes(doc), `usage is missing ${doc}`)
   }
 })
+
+test("usage lists the report flags from SPEC §8.3", () => {
+  for (const flag of ["--by", "--details", "--normalize"]) {
+    assert.ok(USAGE.includes(flag), `usage is missing \`${flag}\``)
+  }
+})

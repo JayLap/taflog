@@ -53,13 +53,71 @@ test("parseConfigFile rejects unknown keys and invalid values", () => {
 
 test("resolveConfig defaults every key from an empty file", () => {
   const resolved = resolveConfig({ env: { XDG_DATA_HOME: "/data" }, platform: "linux" })
-  assert.deepEqual(Object.keys(resolved).sort(), [...CONFIG_KEYS].sort())
+  const scalarKeys = CONFIG_KEYS.filter((key) => !key.startsWith("dayTargets."))
+  assert.deepEqual(
+    Object.keys(resolved).sort(),
+    [...new Set([...scalarKeys, "dayTargets"])].sort(),
+  )
   assert.deepEqual(resolved.version, { value: 1, source: "default" })
   assert.deepEqual(resolved.dir, { value: join("/data", "taflog"), source: "default" })
   assert.deepEqual(resolved.weekStart, { value: "monday", source: "default" })
   assert.deepEqual(resolved.maxTimerHours, { value: 8, source: "default" })
   assert.deepEqual(resolved.color, { value: "auto", source: "default" })
   assert.deepEqual(resolved.icons, { value: "auto", source: "default" })
+  assert.deepEqual(resolved.reportStep, { value: 300, source: "default" })
+  assert.deepEqual(resolved.dayTargets.monday, { value: 27000, source: "default" })
+  assert.deepEqual(resolved.dayTargets.friday, { value: 19800, source: "default" })
+  assert.deepEqual(resolved.dayTargets.saturday, { value: null, source: "default" })
+})
+
+test("dayTargets and reportStep come from the file, off meaning no target", () => {
+  const file = parseConfigFile({
+    reportStep: "15m",
+    dayTargets: { monday: "8h", friday: "off", saturday: "4h" },
+  })
+  assert.deepEqual(file, {
+    reportStep: 900,
+    dayTargets: { monday: 28800, friday: null, saturday: 14400 },
+  })
+  const resolved = resolveConfig({ file, env: { XDG_DATA_HOME: "/data" }, platform: "linux" })
+  assert.deepEqual(resolved.reportStep, { value: 900, source: "file" })
+  assert.deepEqual(resolved.dayTargets.monday, { value: 28800, source: "file" })
+  assert.deepEqual(resolved.dayTargets.friday, { value: null, source: "file" })
+  assert.deepEqual(resolved.dayTargets.saturday, { value: 14400, source: "file" })
+  assert.deepEqual(resolved.dayTargets.tuesday, { value: 27000, source: "default" })
+})
+
+test("dayTargets and reportStep reject invalid values", () => {
+  for (const bad of [
+    { reportStep: "soon" },
+    { reportStep: "0m" },
+    { reportStep: 5 },
+    { dayTargets: { monday: "25h" } },
+    { dayTargets: { monday: "7h30m30s" } },
+    { dayTargets: { funday: "1h" } },
+    { dayTargets: "7h" },
+  ]) {
+    assert.throws(() => parseConfigFile(bad), ConfigError, JSON.stringify(bad))
+  }
+})
+
+test("set writes nested dayTargets and a typed reportStep", async () => {
+  await withTempDir(async (dir) => {
+    const file = join(dir, "config.json")
+    const store = new JsonConfigStore(file)
+    assert.deepEqual(await setConfigValue(store, "dayTargets.monday", "7h"), {
+      key: "dayTargets.monday",
+      value: "7h",
+    })
+    await setConfigValue(store, "dayTargets.friday", "off")
+    await setConfigValue(store, "reportStep", "15")
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), {
+      reportStep: "15m",
+      dayTargets: { monday: "7h", friday: "off" },
+    })
+    await assert.rejects(setConfigValue(store, "dayTargets.funday", "1h"), ConfigError)
+    await assert.rejects(setConfigValue(store, "dayTargets.monday", "lots"), ConfigError)
+  })
 })
 
 test("dir precedence is flag > env > file > default", () => {

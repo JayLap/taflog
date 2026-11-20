@@ -7,6 +7,23 @@
 /** First day of a Report week (SPEC §7). Defaults to `monday` (ISO). */
 export type WeekStart = "monday" | "sunday"
 
+/** Lowercase weekday names indexed by `Date#getDay()` (Sunday is 0). */
+export const WEEKDAYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const
+export type Weekday = (typeof WEEKDAYS)[number]
+
+/** The weekday of a local calendar date. */
+export function weekdayOf(date: Date): Weekday {
+  return WEEKDAYS[date.getDay()]!
+}
+
 /** Local midnight at the start of `date`'s calendar day. */
 export function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())

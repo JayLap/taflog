@@ -1,7 +1,8 @@
 import { reduceEvents } from "../domain/reduce.ts"
 import type { Report } from "../domain/report.ts"
 import { buildReport } from "../domain/report.ts"
-import type { WeekStart } from "../domain/datetime.ts"
+import { formatLocalDate, type WeekStart } from "../domain/datetime.ts"
+import { normalizeReport, selectProject, type DayTargets } from "../domain/normalize.ts"
 import type { Clock } from "../ports/clock.ts"
 import type { EventLog } from "../ports/event-log.ts"
 import type { DateRange, RangeInput } from "./range.ts"
@@ -11,6 +12,11 @@ export interface BuildReportInput extends RangeInput {
   project?: string
   /** Config-derived first day of the week; defaults to Monday (SPEC §7). */
   weekStart?: WeekStart
+  /**
+   * `--normalize`: rescale each completed day to its target (SPEC §9.3). The
+   * targets and step come from configuration.
+   */
+  normalize?: { dayTargets: DayTargets; step: number }
 }
 
 export interface BuildReportResult {
@@ -50,6 +56,21 @@ export class BuildReport {
         : state.adjustments.filter(
             (adjustment) => adjustment.project.toLowerCase() === project.toLowerCase(),
           )
+
+    if (input.normalize !== undefined) {
+      // A day target covers every Project, so scale the whole day first and
+      // only then narrow to the requested Project.
+      const full = buildReport(state.entries, state.adjustments, range.from, range.to, weekStart)
+      const normalized = normalizeReport(full, {
+        ...input.normalize,
+        today: formatLocalDate(now),
+      })
+      return {
+        skipped,
+        range,
+        report: project === null ? normalized : selectProject(normalized, project),
+      }
+    }
 
     return {
       skipped,

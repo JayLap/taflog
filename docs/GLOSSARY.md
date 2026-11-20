@@ -82,6 +82,19 @@ by default and becomes the Event's `at`, so it closes the Entry and, for
 `switch`, opens the next Timer at that instant.
 _Avoid_: backdate, fake time, manual timestamp
 
+**Day target**:
+The Total time a weekday is scaled to by `report --normalize`, set per weekday
+by `dayTargets.<weekday>` (or `off`). It is configuration, never stored in the
+Log.
+_Avoid_: quota, goal, billable hours
+
+**Normalization**:
+The derived rescaling of a completed day's Timed time to its Day target, rounded
+to `reportStep`. It changes the Report only; no Event is written and no Entry
+is edited.
+_Avoid_: rounding (that is one step of it), fitting, adjusting (an Adjustment
+is a stored correction)
+
 **Week**:
 The report window beginning on `weekStart` (ISO Monday by default).
 _Avoid_: period

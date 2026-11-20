@@ -33,11 +33,26 @@ export interface ReportDay {
   projects: Array<{ project: string; totalSeconds: number }>
 }
 
+/** One day a Normalization rescaled, with its totals before and after. */
+export interface NormalizedDay {
+  date: string
+  targetSeconds: number
+  originalSeconds: number
+  normalizedSeconds: number
+}
+
+/** Present on a Report that went through `normalizeReport` (SPEC §9.3). */
+export interface Normalization {
+  stepSeconds: number
+  days: NormalizedDay[]
+}
+
 /** The derived Report (SPEC §9.3, §9.5). */
 export interface Report {
   range: { from: string; to: string; weekStart: WeekStart }
   byProject: ReportProject[]
   byDay: ReportDay[]
+  normalization?: Normalization
 }
 
 interface DetailBucket {

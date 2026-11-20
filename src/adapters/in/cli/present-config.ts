@@ -1,9 +1,12 @@
 import {
   CONFIG_KEYS,
   type ConfigKey,
+  resolvedFor,
+  weekdayOfKey,
   type Resolved,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
+import { formatDurationInput } from "../../../domain/duration.ts"
 import { createStyle, sanitizeForTerminal, type Style } from "./style.ts"
 
 export interface RenderConfigOptions {
@@ -20,13 +23,13 @@ export interface RenderConfigOptions {
 export function renderConfig(view: ResolvedConfig, options: RenderConfigOptions = {}): string {
   const style = options.style ?? createStyle()
   if (options.key !== undefined) {
-    return `${sanitizeForTerminal(String(view[options.key].value))}\n`
+    return `${sanitizeForTerminal(displayValue(view, options.key))}\n`
   }
 
   const rows = CONFIG_KEYS.map((key) => ({
     key,
-    value: sanitizeForTerminal(String(view[key].value)),
-    source: view[key].source,
+    value: sanitizeForTerminal(displayValue(view, key)),
+    source: resolvedFor(view, key).source,
   }))
   const keyWidth = Math.max(...rows.map((row) => row.key.length))
   const valueWidth = Math.max(...rows.map((row) => row.value.length))
@@ -40,6 +43,14 @@ export function renderConfig(view: ResolvedConfig, options: RenderConfigOptions 
   )
 }
 
+/** Text form of a value: durations as typed (`7h30m`), `off` for no target. */
+function displayValue(view: ResolvedConfig, key: ConfigKey): string {
+  const { value } = resolvedFor(view, key)
+  if (weekdayOfKey(key) !== null) return value === null ? "off" : formatDurationInput(value as number)
+  if (key === "reportStep") return formatDurationInput(value as number)
+  return String(value)
+}
+
 export interface ConfigJsonOptions {
   pretty?: boolean
   /** Emit a single key instead of the whole effective configuration. */
@@ -49,7 +60,7 @@ export interface ConfigJsonOptions {
 /** JSON presenter for `config`; frozen `version: 1` (SPEC §9.5). */
 export function configJson(view: ResolvedConfig, options: ConfigJsonOptions = {}): string {
   if (options.key !== undefined) {
-    const { value, source } = view[options.key]
+    const { value, source } = resolvedFor(view, options.key)
     return `${JSON.stringify(
       { version: 1, key: options.key, value, source },
       null,
@@ -59,7 +70,8 @@ export function configJson(view: ResolvedConfig, options: ConfigJsonOptions = {}
 
   const config: Record<string, Resolved<unknown>> = {}
   for (const key of CONFIG_KEYS) {
-    config[key] = { value: view[key].value, source: view[key].source }
+    const { value, source } = resolvedFor(view, key)
+    config[key] = { value, source }
   }
   return `${JSON.stringify(
     { version: 1, config },

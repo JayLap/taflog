@@ -36,7 +36,8 @@ Hexagonal, hand-wired composition root. See ADR-0005.
 ```
 src/
   domain/        pure: Event/Entry types, reduceEvents, deriveTimer,
-                 aggregations, duration and date formatting, config schema
+                 aggregations, normalization (`normalizeReport`), duration and date
+                 formatting, config schema
   ports/         Clock { now() }, EventLog { append, readAll, readRaw }
   application/   one use case per command: StartTask, StopTask, SwitchTask,
                  ShowStatus, AddAdjustment, SubAdjustment, RemoveEntry,
@@ -167,6 +168,15 @@ Overridable by `TAFLOG_CONFIG`.
 | `maxTimerHours` | positive number | `8` | Forgotten-Timer threshold |
 | `color` | `auto` \| `always` \| `never` | `auto` | Colour policy |
 | `icons` | `auto` \| `nerd` \| `ascii` | `auto` | Glyph profile (§9.4) |
+| `reportStep` | Duration, whole minutes | `5m` | Rounding unit of `report --normalize` (§9.3) |
+| `dayTargets.<weekday>` | Duration up to `24h`, or `off` | `7h30m` Mon–Thu, `5h30m` Fri, `off` Sat/Sun | Total time `report --normalize` scales that weekday to (§9.3) |
+
+`dayTargets.<weekday>` (`monday`…`sunday`) is stored as a nested `dayTargets`
+object in the config file and addressed with the dotted key in `config` and
+`set` (`taflog set dayTargets.monday 7h30m`). `off` removes the target for that
+weekday, so it is never scaled; an unset weekday takes its default. Durations
+in the config file are strings (`"7h30m"`, `"off"`); `config --json` reports
+them in seconds, with `null` for `off`. Durations must be whole minutes.
 
 Precedence for every key: `--flag` > env (`TAFLOG_DIR`, `TAFLOG_ICONS`) >
 config file > default. Unknown keys and invalid values are usage errors (exit
@@ -211,7 +221,7 @@ Timer (SPEC §6, §10).
 - `log`: `--today`, `--week`, `--month`, `--project <p>`, `--from <date>`,
   `--to <date>`, `--limit <n>`, `--ids`.
 - `report`: `--today`, `--week`, `--month`, `--project <p>`, `--from <date>`,
-  `--to <date>`, `--by project|day`, `--details`.
+  `--to <date>`, `--by project|day`, `--details`, `--normalize`.
 - Defaults: `log` = today; `report` = this week.
 
 ### 8.4 Exit codes
@@ -312,6 +322,42 @@ Week 43 · Mon 20 → Sun 26 Oct 2025 · 19h30m
   Total        2h30    3h45    5h00    3h45    4h30   19h30
 ```
 
+`--normalize` rescales completed days to their configured target; it works
+with the summary, `--by day`, and `--details`:
+
+```console
+$ taflog set reportStep 15m
+$ taflog report --details --normalize
+Week 43 · Mon 20 → Sun 26 Oct 2025 · 7h30m · normalized
+                Mon     Tue     Wed     Thu     Fri   Total
+  project-1    5h00    0h00    0h00    0h00    0h00    5h00
+    devops     5h00                                    5h00
+  project-2    2h30    0h00    0h00    0h00    0h00    2h30
+    support    2h30                                    2h30
+  ─────────────────────────────────────────────────────────
+  Total        7h30    0h00    0h00    0h00    0h00    7h30
+```
+
+`--normalize` rules:
+
+- A day is rescaled when it is **complete** (its date is before today), its
+  weekday has a `dayTargets` value other than `off`, and it has Timed time.
+  Other days render unchanged, including today and a running Timer.
+- Buckets are (Project, Description) pairs per day. Each is scaled by the same
+  ratio, then rounded to `reportStep` with the largest-remainder method so the
+  day's Total time equals its target **exactly**. A budget that is not a
+  multiple of `reportStep` puts the remainder on the largest bucket.
+- Adjustments are fixed. They count toward the target and are never scaled, so
+  the Timed buckets share `target − adjusted`. If that leaves less than one step,
+  the day is left unchanged.
+- Days above their target scale down, not just up.
+- Every bucket with Timed time keeps at least one step (taken from the largest
+  bucket) when the day has enough steps to go round, so no task disappears.
+- `--project` narrows the result **after** normalizing: the target covers all
+  Projects, so scaling never sees only one.
+- Only the view changes; nothing is written to the Log (ADR-0009). The header
+  ends with `· normalized`.
+
 `--details` rules: days are columns; a Description with no time on a day renders
 **blank** (spaces), never `0h00`; Description rows sort by week total desc;
 untitled time buckets as `(no description)`; a Project row equals **the sum of
@@ -359,7 +405,11 @@ pretty-printing unless `--pretty`; never coloured.
       "deltaSeconds": 3000, "note": "forgot to start" } ],
   "totals": { "timedSeconds": 8040, "adjustedSeconds": 3000, "totalSeconds": 11040 } }
 
-// taflog report --json  (always contains both byProject and byDay)
+// taflog report --json  (always contains both byProject and byDay; with --normalize
+// every value is the normalized one and a "normalization" object is added:
+//   "normalization": { "stepSeconds": 900,
+//     "days": [ { "date": "2025-10-20", "targetSeconds": 27000,
+//                 "originalSeconds": 22380, "normalizedSeconds": 27000 } ] } )
 { "version": 1, "range": { "from": "2025-10-20", "to": "2025-10-26", "weekStart": "monday" },
   "byProject": [ { "project": "acme", "timedSeconds": 62100,
                    "adjustedSeconds": -1800, "totalSeconds": 60300,
@@ -409,6 +459,10 @@ never parsed. This is the machine API for the Log's source of truth.
 - Interactive prompt: Project/Description input for `start`/`switch` and
   Project/Duration input for `add`/`sub`, plus re-prompting, against a seeded
   Log; candidates are covered by the `LogCandidates` tests.
+- Normalization: `allocate` (sums to the budget, one-step minimum, remainder,
+  determinism) and `normalizeReport` (target, Adjustments, today, `off`,
+  scale-down, `--project`) as pure domain tests; config tests cover
+  `dayTargets.*` and `reportStep`.
 - Rendering: golden tests for every specimen in §9; `--json` shape snapshots.
 
 ## 12. Non-goals and deferred

@@ -2,6 +2,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import {
   CONFIG_KEYS,
+  DEFAULT_DAY_TARGETS,
+  DEFAULT_REPORT_STEP,
+  weekdayOfKey,
   type ColorPolicy,
   type Config,
   type ConfigKey,
@@ -11,7 +14,9 @@ import {
   type Resolved,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
-import type { WeekStart } from "../../../domain/datetime.ts"
+import { WEEKDAYS, type WeekStart, type Weekday } from "../../../domain/datetime.ts"
+import { formatDurationInput, parseDuration } from "../../../domain/duration.ts"
+import type { DayTargets } from "../../../domain/normalize.ts"
 import { DEFAULT_MAX_TIMER_HOURS } from "../../../domain/timer.ts"
 import { defaultDataDir } from "../store/paths.ts"
 import { ConfigError } from "./errors.ts"
@@ -40,6 +45,9 @@ export function isConfigKey(key: string): key is ConfigKey {
   return (CONFIG_KEYS as readonly string[]).includes(key)
 }
 
+/** The longest day target accepted (a full day). */
+const MAX_TARGET_SECONDS = 24 * 3600
+
 /** Validate a parsed JSON value into a partial config; unknown keys fail. */
 export function parseConfigFile(raw: unknown): PartialConfig {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
@@ -47,7 +55,7 @@ export function parseConfigFile(raw: unknown): PartialConfig {
   }
   const source = raw as Record<string, unknown>
   for (const key of Object.keys(source)) {
-    if (!isConfigKey(key)) throw new ConfigError(`unknown config key: ${key}`)
+    if (key !== "dayTargets" && !isConfigKey(key)) throw new ConfigError(`unknown config key: ${key}`)
   }
 
   const config: PartialConfig = {}
@@ -57,11 +65,14 @@ export function parseConfigFile(raw: unknown): PartialConfig {
   if ("maxTimerHours" in source) config.maxTimerHours = parseMaxTimerHours(source.maxTimerHours)
   if ("color" in source) config.color = parseColor(source.color)
   if ("icons" in source) config.icons = parseIcons(source.icons)
+  if ("reportStep" in source) config.reportStep = parseReportStep(source.reportStep)
+  if ("dayTargets" in source) config.dayTargets = parseDayTargets(source.dayTargets)
   return config
 }
 
 /** Validate one `set <key> <value>` argument into a typed value. */
-export function parseCliValue(key: ConfigKey, raw: string): string | number {
+export function parseCliValue(key: ConfigKey, raw: string): string | number | null {
+  if (weekdayOfKey(key) !== null) return parseDayTarget(raw, key)
   switch (key) {
     case "version":
       return parseVersion(Number(raw))
@@ -75,6 +86,10 @@ export function parseCliValue(key: ConfigKey, raw: string): string | number {
       return parseColor(raw)
     case "icons":
       return parseIcons(raw)
+    case "reportStep":
+      return parseReportStep(raw)
+    default:
+      throw new ConfigError(`unknown config key: ${key}`)
   }
 }
 
@@ -94,6 +109,8 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
     maxTimerHours: DEFAULT_MAX_TIMER_HOURS,
     color: "auto",
     icons: "auto",
+    reportStep: DEFAULT_REPORT_STEP,
+    dayTargets: DEFAULT_DAY_TARGETS,
     ...options.defaults,
   }
 
@@ -141,6 +158,18 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
       ],
       defaults.icons,
     ),
+    reportStep: first([[file.reportStep ?? null, "file"]], defaults.reportStep),
+    dayTargets: Object.fromEntries(
+      WEEKDAYS.map((weekday) => {
+        const fromFile = file.dayTargets?.[weekday]
+        return [
+          weekday,
+          fromFile === undefined
+            ? { value: defaults.dayTargets[weekday], source: "default" }
+            : { value: fromFile, source: "file" },
+        ]
+      }),
+    ) as ResolvedConfig["dayTargets"],
   }
 }
 
@@ -148,6 +177,22 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
 export interface SetConfigValueResult {
   key: ConfigKey
   value: string | number
+}
+
+/** Merge one validated value over a stored config, nesting `dayTargets.*`. */
+function mergeValue(file: PartialConfig, key: ConfigKey, value: string | number | null): PartialConfig {
+  const weekday = weekdayOfKey(key)
+  if (weekday !== null) {
+    return { ...file, dayTargets: { ...file.dayTargets, [weekday]: value as number | null } }
+  }
+  return { ...file, [key]: value } as PartialConfig
+}
+
+/** What `set` echoes back: durations in the form a person types them. */
+function displayValue(key: ConfigKey, value: string | number | null): string | number {
+  if (weekdayOfKey(key) !== null) return value === null ? "off" : formatDurationInput(value as number)
+  if (key === "reportStep") return formatDurationInput(value as number)
+  return value as string | number
 }
 
 /**
@@ -161,9 +206,8 @@ export async function setConfigValue(
 ): Promise<SetConfigValueResult> {
   if (!isConfigKey(key)) throw new ConfigError(`unknown config key: ${key}`)
   const value = parseCliValue(key, raw)
-  const merged = { ...(await store.read()), [key]: value } as PartialConfig
-  await store.write(merged)
-  return { key, value }
+  await store.write(mergeValue(await store.read(), key, value))
+  return { key, value: displayValue(key, value) }
 }
 
 /** Reads and writes the versioned JSON config file (ADR-0002, SPEC §7). */
@@ -202,8 +246,20 @@ export class JsonConfigStore {
     await mkdir(dirname(this.file), { recursive: true })
     const ordered: Record<string, unknown> = {}
     for (const key of CONFIG_KEYS) {
-      const value = config[key]
-      if (value !== undefined) ordered[key] = value
+      if (key === "reportStep") {
+        if (config.reportStep !== undefined) ordered[key] = formatDurationInput(config.reportStep)
+      } else if (weekdayOfKey(key) === null) {
+        const value = config[key as keyof PartialConfig]
+        if (value !== undefined) ordered[key] = value
+      }
+    }
+    if (config.dayTargets !== undefined) {
+      const targets: Record<string, string> = {}
+      for (const weekday of WEEKDAYS) {
+        const value = config.dayTargets[weekday]
+        if (value !== undefined) targets[weekday] = value === null ? "off" : formatDurationInput(value)
+      }
+      if (Object.keys(targets).length > 0) ordered.dayTargets = targets
     }
     await writeFile(this.file, `${JSON.stringify(ordered, null, 2)}\n`, { mode: 0o600 })
   }
@@ -251,6 +307,45 @@ function parseColor(value: unknown): ColorPolicy {
 function parseIcons(value: unknown): IconsProfile {
   if (value === "auto" || value === "nerd" || value === "ascii") return value
   throw new ConfigError(`invalid icons: ${String(value)}`)
+}
+
+/** A whole-minute Duration of at least one minute, as seconds. */
+function parseWholeMinutes(value: unknown): number | null {
+  const seconds = typeof value === "string" ? parseDuration(value) : null
+  if (seconds === null || seconds < 60 || seconds % 60 !== 0) return null
+  return seconds
+}
+
+function parseReportStep(value: unknown): number {
+  const seconds = parseWholeMinutes(value)
+  if (seconds === null || seconds > MAX_TARGET_SECONDS) {
+    throw new ConfigError(`invalid reportStep: ${String(value)} (expected e.g. 5m or 15m)`)
+  }
+  return seconds
+}
+
+/** A day target: a whole-minute Duration up to 24h, or `off` for no scaling. */
+function parseDayTarget(value: unknown, key: string): number | null {
+  if (typeof value === "string" && value.trim().toLowerCase() === "off") return null
+  const seconds = parseWholeMinutes(value)
+  if (seconds === null || seconds > MAX_TARGET_SECONDS) {
+    throw new ConfigError(`invalid ${key}: ${String(value)} (expected e.g. 7h30m, or off)`)
+  }
+  return seconds
+}
+
+function parseDayTargets(value: unknown): Partial<DayTargets> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new ConfigError("invalid dayTargets: expected an object keyed by weekday")
+  }
+  const targets: Partial<Record<Weekday, number | null>> = {}
+  for (const [name, raw] of Object.entries(value)) {
+    if (!(WEEKDAYS as readonly string[]).includes(name)) {
+      throw new ConfigError(`unknown config key: dayTargets.${name}`)
+    }
+    targets[name as Weekday] = parseDayTarget(raw, `dayTargets.${name}`)
+  }
+  return targets
 }
 
 function parseEnvIcons(value: string | undefined): IconsProfile | null {

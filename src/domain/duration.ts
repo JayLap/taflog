@@ -32,3 +32,16 @@ export function parseDuration(input: string): number | null {
   if (bare !== null) return Math.round(Number(bare[1]) * 60)
   return null
 }
+
+/**
+ * Render whole-minute seconds in the form `parseDuration` accepts and a person
+ * would type: `5m`, `8h`, `7h30m`. Used where a Duration is written back as
+ * text (config file, `config`, `set`).
+ */
+export function formatDurationInput(seconds: number): string {
+  const totalMinutes = Math.round(seconds / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours === 0) return `${minutes}m`
+  return minutes === 0 ? `${hours}h` : `${hours}h${minutes}m`
+}

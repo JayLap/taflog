@@ -31,7 +31,8 @@ export function renderReport(result: BuildReportResult, options: ReportRenderOpt
   }
 
   const total = report.byProject.reduce((sum, project) => sum + project.totalSeconds, 0)
-  const title = rangeTitle(result.range, style, total)
+  const normalized = report.normalization === undefined ? "" : ` ${style.glyphs.date} normalized`
+  const title = `${rangeTitle(result.range, style, total)}${normalized}`
   const body =
     options.grid === true || options.details === true
       ? renderGrid(report, result.range, style, options.details === true)
@@ -191,6 +192,7 @@ export function reportJson(result: BuildReportResult, options: { pretty?: boolea
       })),
     })),
     byDay: report.byDay,
+    ...(report.normalization === undefined ? {} : { normalization: report.normalization }),
   }
   return `${JSON.stringify(payload, null, options.pretty === true ? 2 : undefined)}\n`
 }

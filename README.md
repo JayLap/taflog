@@ -53,7 +53,7 @@ command and flag.
 `log` and `report` accept `--today`, `--week`, `--month`, `--project <p>`,
 `--from <date>`, and `--to <date>`. `log` defaults to today and adds
 `--limit <n>` and `--ids`; `report` defaults to this week and adds
-`--by project|day` and `--details`.
+`--by project|day`, `--details`, and `--normalize`.
 
 Durations parse `90m`, `1h`, `1h30m`, `1.5h`, and a bare number of minutes
 (`50` → `50m`). Dates accept `YYYY-MM-DD`, `today`, `yesterday`, and weekday
@@ -108,6 +108,20 @@ Outside a terminal (for example in a script or agent), these commands still
 require their operands and exit with a usage error. Pressing Ctrl+C cancels the
 prompt without writing an event.
 
+### Normalized reports
+
+`taflog report --normalize` rescales each **completed** day so its Total time
+equals that weekday's target (`dayTargets.<weekday>`), rounded to `reportStep`.
+Every Project/Description bucket of the day is scaled by the same ratio;
+Adjustments count toward the target but are never scaled. Today, days with no
+target (`off`), and days with no Timed time are left as they are. Nothing is
+written to the log; it is a view.
+
+```console
+$ taflog set reportStep 15m
+$ taflog report --details --normalize     # 4h13 + 2h on a Monday → 5h00 + 2h30
+```
+
 ### Output
 
 Every read command accepts `--json` (add `--pretty` to indent it) and emits a
@@ -127,6 +141,8 @@ Every key is optional and stored in a versioned JSON config file.
 | `maxTimerHours` | positive number | `8` | Forgotten-timer threshold |
 | `color` | `auto` \| `always` \| `never` | `auto` | Colour policy |
 | `icons` | `auto` \| `nerd` \| `ascii` | `auto` | Glyph profile |
+| `reportStep` | duration (whole minutes) | `5m` | Rounding unit of `report --normalize` |
+| `dayTargets.<weekday>` | duration up to `24h`, or `off` | `7h30m` Mon–Thu, `5h30m` Fri, `off` Sat/Sun | Total time `report --normalize` scales that weekday to |
 
 ```console
 $ taflog set dir ~/logs/taflog

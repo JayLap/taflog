@@ -22,6 +22,7 @@ export interface GlobalOptions {
   ids: boolean
   by: ReportBy | null
   details: boolean
+  normalize: boolean
   pretty: boolean
   seconds: boolean
   help: boolean
@@ -60,6 +61,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     ids: false,
     by: null,
     details: false,
+    normalize: false,
     pretty: false,
     seconds: false,
     help: false,
@@ -114,6 +116,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
     if (arg === "--details") {
       options.details = true
+      continue
+    }
+    if (arg === "--normalize") {
+      options.normalize = true
       continue
     }
     if (arg === "--pretty") {

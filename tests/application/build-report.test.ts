@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { FakeClock, InMemoryEventLog } from "../support/fakes.ts"
 import { BuildReport } from "../../src/application/build-report.ts"
 import type { Event } from "../../src/domain/events.ts"
+import { DEFAULT_DAY_TARGETS } from "../../src/domain/config.ts"
 
 const at = (date: string, time: string): string => `${date}T${time}:00.000Z`
 
@@ -70,4 +71,31 @@ test("BuildReport surfaces the skipped-line count", async () => {
   log.skipped = 1
   const result = await new BuildReport(clock, log).execute({})
   assert.equal(result.skipped, 1)
+})
+
+/** A local-time instant on Monday 2025-10-20, so day boundaries are timezone-proof. */
+const local = (hour: number, minute: number): string => new Date(2025, 9, 20, hour, minute).toISOString()
+
+test("BuildReport --normalize rescales completed days only, then applies --project", async () => {
+  const log = new InMemoryEventLog([
+    { v: 1, id: "aaaaaaa1", t: "start", at: local(8, 0), project: "p1", description: "devops" },
+    { v: 1, id: "bbbbbbb2", t: "switch", at: local(12, 13), from: "aaaaaaa1", project: "p2", description: "support" },
+    { v: 1, id: "ccccccc3", t: "stop", at: local(14, 13), entry: "bbbbbbb2" },
+  ])
+  const normalize = { dayTargets: { ...DEFAULT_DAY_TARGETS }, step: 900 }
+
+  const clock = new FakeClock("2025-10-22T12:00:00")
+  const result = await new BuildReport(clock, log).execute({ normalize })
+  assert.equal(result.report.byDay[0]?.totalSeconds, 27000)
+  assert.equal(result.report.normalization?.days.length, 1)
+
+  const filtered = await new BuildReport(clock, log).execute({ normalize, project: "P2" })
+  assert.deepEqual(filtered.report.byProject.map((p) => p.project), ["p2"])
+  assert.equal(filtered.report.byProject[0]?.totalSeconds, 9000)
+
+  const sameDay = await new BuildReport(new FakeClock("2025-10-20T23:00:00"), log).execute({ normalize })
+  assert.equal(sameDay.report.byDay[0]?.totalSeconds, 6 * 3600 + 13 * 60)
+
+  const plain = await new BuildReport(clock, log).execute({})
+  assert.equal(plain.report.normalization, undefined)
 })

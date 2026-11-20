@@ -577,3 +577,44 @@ test("an invalid time in the time slot is a usage error", () => {
     assert.match(result.stderr, /invalid time/)
   })
 })
+
+test("report --details --normalize rescales completed days to the day target", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    const text = run(dir, ["report", ...weekArgs, "--details", "--normalize", "--no-color"])
+    assert.equal(text.status, 0)
+    assert.match(text.stdout.split("\n")[0] ?? "", /normalized$/)
+    const total = text.stdout.split("\n").find((line) => line.startsWith("  Total")) ?? ""
+    // Monday and Tuesday are both rescaled to the default 7h30 target.
+    assert.match(total, /7h30\s+7h30\s+/)
+
+    const parsed = JSON.parse(run(dir, ["report", ...weekArgs, "--normalize", "--json"]).stdout)
+    assert.equal(parsed.normalization.stepSeconds, 300)
+    assert.deepEqual(
+      parsed.normalization.days.map((day: { date: string }) => day.date),
+      ["2025-10-20", "2025-10-21"],
+    )
+    assert.equal(parsed.byDay[0].totalSeconds, 27000)
+    assert.equal(parsed.byDay[1].totalSeconds, 27000)
+  })
+})
+
+test("a day target set to off keeps that day unscaled; --normalize honours --project", () => {
+  withTempDir((dir) => {
+    seedWeek(dir)
+    assert.equal(run(dir, ["set", "dayTargets.monday", "off"]).status, 0)
+    assert.equal(run(dir, ["set", "reportStep", "15m"]).status, 0)
+    const parsed = JSON.parse(run(dir, ["report", ...weekArgs, "--normalize", "--json"]).stdout)
+    assert.equal(parsed.normalization.stepSeconds, 900)
+    assert.deepEqual(
+      parsed.normalization.days.map((day: { date: string }) => day.date),
+      ["2025-10-21"],
+    )
+    assert.equal(parsed.byDay[0].totalSeconds, 5400)
+
+    const beta = JSON.parse(
+      run(dir, ["report", ...weekArgs, "--normalize", "--project", "beta", "--json"]).stdout,
+    )
+    assert.deepEqual(beta.byProject.map((project: { project: string }) => project.project), ["beta"])
+  })
+})
