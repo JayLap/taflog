@@ -1,14 +1,14 @@
-import { parseLocalDate, weekdayOf, type Weekday } from "./datetime.ts"
-import type {
-  NormalizedDay,
-  Report,
-  ReportDay,
-  ReportDetail,
-  ReportProject,
+import type { DayTargets } from "./config.ts"
+import { parseLocalDate, weekdayOf } from "./datetime.ts"
+import {
+  compareDetails,
+  compareProjects,
+  deriveByDay,
+  type NormalizedDay,
+  type Report,
+  type ReportDetail,
+  type ReportProject,
 } from "./report.ts"
-
-/** Target seconds per weekday; `null` leaves that weekday unscaled (SPEC §7). */
-export type DayTargets = Record<Weekday, number | null>
 
 export interface NormalizeOptions {
   dayTargets: DayTargets
@@ -40,22 +40,17 @@ export function allocate(weights: number[], budget: number, step: number): numbe
 
   const quotas = weights.map((weight) => (units * weight) / total)
   const shares = quotas.map((quota) => Math.floor(quota))
-  const byRemainder = weights
-    .map((_, index) => index)
-    .sort(
-      (left, right) =>
-        quotas[right]! - shares[right]! - (quotas[left]! - shares[left]!) ||
-        weights[right]! - weights[left]! ||
-        left - right,
-    )
+  const byRemainder = rank(
+    weights.length,
+    (left, right) =>
+      quotas[right]! - shares[right]! - (quotas[left]! - shares[left]!) ||
+      weights[right]! - weights[left]!,
+  )
   const leftover = units - shares.reduce((sum, share) => sum + share, 0)
   for (const index of byRemainder.slice(0, leftover)) shares[index]! += 1
 
   if (units >= weights.length) {
-    const byWeight = weights
-      .map((_, index) => index)
-      .sort((left, right) => weights[right]! - weights[left]! || left - right)
-    for (const index of byWeight) {
+    for (const index of rank(weights.length, (left, right) => weights[right]! - weights[left]!)) {
       if (shares[index]! > 0) continue
       shares[largest(shares)]! -= 1
       shares[index] = 1
@@ -65,6 +60,13 @@ export function allocate(weights: number[], budget: number, step: number): numbe
   const seconds = shares.map((share) => share * step)
   seconds[largest(seconds)]! += budget - units * step
   return seconds
+}
+
+/** Indices `0..count-1` ordered by `compare`, ties by position. */
+function rank(count: number, compare: (left: number, right: number) => number): number[] {
+  return Array.from({ length: count }, (_, index) => index).sort(
+    (left, right) => compare(left, right) || left - right,
+  )
 }
 
 function largest(values: number[]): number {
@@ -135,11 +137,7 @@ export function normalizeReport(report: Report, options: NormalizeOptions): Repo
         byDay,
       }
     })
-    details.sort(
-      (left, right) =>
-        right.totalSeconds - left.totalSeconds ||
-        left.description.localeCompare(right.description),
-    )
+    details.sort(compareDetails)
     const timedSeconds = details.reduce((sum, detail) => sum + detail.totalSeconds, 0)
     if (timedSeconds === 0 && project.adjustedSeconds === 0) return []
     return [
@@ -176,33 +174,4 @@ export function selectProject(report: Report, project: string): Report {
       report.byDay.map((day) => day.date),
     ),
   }
-}
-
-function deriveByDay(byProject: ReportProject[], dates: string[]): ReportDay[] {
-  return dates.map((date) => {
-    const projects = byProject
-      .map((project) => ({
-        project: project.project,
-        totalSeconds:
-          project.details.reduce(
-            (sum, detail) =>
-              sum + (detail.byDay.find((item) => item.date === date)?.timedSeconds ?? 0),
-            0,
-          ) + (project.adjustmentDays.find((item) => item.date === date)?.deltaSeconds ?? 0),
-      }))
-      .filter((project) => project.totalSeconds !== 0)
-      .sort(
-        (left, right) =>
-          right.totalSeconds - left.totalSeconds || left.project.localeCompare(right.project),
-      )
-    return {
-      date,
-      totalSeconds: projects.reduce((sum, project) => sum + project.totalSeconds, 0),
-      projects,
-    }
-  })
-}
-
-function compareProjects(left: ReportProject, right: ReportProject): number {
-  return right.totalSeconds - left.totalSeconds || left.project.localeCompare(right.project)
 }

@@ -110,10 +110,6 @@ test("normalizeReport scales a day down when it is above target", () => {
 
 test("normalizeReport leaves Adjustments fixed and fits Timed time to target − adjusted", () => {
   const adjustments: Adjustment[] = [{ id: "j", project: "acme", date: "2025-10-20", delta: -30 * M }]
-  const result = normalizeReport(buildReport(mondayEntries(), adjustments, at(20, 0), at(27, 0)), options)
-  assert.equal(result.byDay[0]?.totalSeconds, 7.5 * H)
-  const acme = result.byProject.find((p) => p.project === "project-1")
-  assert.equal(acme?.adjustedSeconds, 0)
   const withAdjust = buildReport(
     [entry("a", "acme", "x", at(20, 8), at(20, 12)), entry("b", "beta", "y", at(20, 13), at(20, 15))],
     adjustments,
@@ -121,9 +117,12 @@ test("normalizeReport leaves Adjustments fixed and fits Timed time to target −
     at(27, 0),
   )
   const fitted = normalizeReport(withAdjust, options)
-  const acmeRow = fitted.byProject.find((p) => p.project === "acme")!
-  assert.equal(acmeRow.adjustedSeconds, -30 * M)
-  assert.equal(acmeRow.timedSeconds + acmeRow.adjustedSeconds + fitted.byProject.find((p) => p.project === "beta")!.totalSeconds, 7.5 * H)
+  const acme = fitted.byProject.find((p) => p.project === "acme")!
+  const beta = fitted.byProject.find((p) => p.project === "beta")!
+  // The −30m Adjustment survives untouched; Timed time fills the other 8h.
+  assert.equal(acme.adjustedSeconds, -30 * M)
+  assert.equal(acme.timedSeconds + beta.timedSeconds, 8 * H)
+  assert.equal(fitted.byDay[0]?.totalSeconds, 7.5 * H)
 })
 
 test("normalizeReport skips today, days without a target, and unscaled weekend days", () => {

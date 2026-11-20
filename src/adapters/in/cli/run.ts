@@ -13,8 +13,8 @@ import {
   type ConfigKey,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
-import { looksLikeTimeOfDay, WEEKDAYS, type WeekStart } from "../../../domain/datetime.ts"
-import type { DayTargets } from "../../../domain/normalize.ts"
+import { byWeekday, looksLikeTimeOfDay, type WeekStart } from "../../../domain/datetime.ts"
+import type { DayTargets } from "../../../domain/config.ts"
 import { TaflogError } from "../../../domain/errors.ts"
 import type { ParsedArgs } from "./args.ts"
 import {
@@ -301,10 +301,10 @@ function rangeInput(
 
 /** The day targets and rounding step `--normalize` needs, from configuration. */
 function normalizeInput(config: ResolvedConfig): { dayTargets: DayTargets; step: number } {
-  const dayTargets = Object.fromEntries(
-    WEEKDAYS.map((weekday) => [weekday, config.dayTargets[weekday].value]),
-  ) as DayTargets
-  return { dayTargets, step: config.reportStep.value }
+  return {
+    dayTargets: byWeekday((weekday) => config.dayTargets[weekday].value),
+    step: config.reportStep.value,
+  }
 }
 
 function joinOperands(parts: string[]): string | undefined {

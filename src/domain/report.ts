@@ -66,10 +66,6 @@ interface ProjectBucket {
   adjustmentByDay: Map<string, number>
 }
 
-interface DayBucket {
-  projects: Map<string, number>
-}
-
 const UNTITLED = "(no description)"
 
 /**
@@ -86,10 +82,6 @@ export function buildReport(
 ): Report {
   const days = enumerateLocalDays(from, to)
   const projects = new Map<string, ProjectBucket>()
-  const byDay = new Map<string, DayBucket>()
-  for (const day of days) {
-    byDay.set(formatLocalDate(day), { projects: new Map() })
-  }
 
   const projectBucket = (project: string): ProjectBucket => {
     let bucket = projects.get(project)
@@ -103,12 +95,6 @@ export function buildReport(
       projects.set(project, bucket)
     }
     return bucket
-  }
-
-  const addProjectTime = (date: string, project: string, seconds: number): void => {
-    const day = byDay.get(date)
-    if (day === undefined) return
-    day.projects.set(project, (day.projects.get(project) ?? 0) + seconds)
   }
 
   for (const entry of entries) {
@@ -127,8 +113,6 @@ export function buildReport(
         bucket.details.set(description, detail)
       }
       detail.byDay.set(date, (detail.byDay.get(date) ?? 0) + seconds)
-
-      addProjectTime(date, entry.project, seconds)
     }
   }
 
@@ -144,10 +128,9 @@ export function buildReport(
       date,
       (bucket.adjustmentByDay.get(date) ?? 0) + adjustment.delta,
     )
-    addProjectTime(date, adjustment.project, adjustment.delta)
   }
 
-  const byProject: ReportProject[] = []
+  const allProjects: ReportProject[] = []
   for (const [project, bucket] of projects) {
     const details: ReportDetail[] = []
     for (const [description, detail] of bucket.details) {
@@ -158,22 +141,14 @@ export function buildReport(
       const totalSeconds = byDayList.reduce((sum, item) => sum + item.timedSeconds, 0)
       details.push({ description, totalSeconds, byDay: byDayList })
     }
-    details.sort(
-      (left, right) =>
-        right.totalSeconds - left.totalSeconds ||
-        left.description.localeCompare(right.description),
-    )
+    details.sort(compareDetails)
 
     const adjustmentDays = [...bucket.adjustmentByDay.entries()]
       .filter(([, delta]) => delta !== 0)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([date, deltaSeconds]) => ({ date, deltaSeconds }))
 
-    if (bucket.timedSeconds === 0 && bucket.adjustedSeconds === 0 && details.length === 0) {
-      continue
-    }
-
-    byProject.push({
+    allProjects.push({
       project,
       timedSeconds: bucket.timedSeconds,
       adjustedSeconds: bucket.adjustedSeconds,
@@ -182,27 +157,13 @@ export function buildReport(
       adjustmentDays,
     })
   }
-  byProject.sort(
-    (left, right) =>
-      right.totalSeconds - left.totalSeconds || left.project.localeCompare(right.project),
-  )
-
-  const byDayList: ReportDay[] = days.map((day) => {
-    const date = formatLocalDate(day)
-    const bucket = byDay.get(date)!
-    const projectList = [...bucket.projects.entries()]
-      .filter(([, seconds]) => seconds !== 0)
-      .map(([project, totalSeconds]) => ({ project, totalSeconds }))
-      .sort(
-        (left, right) =>
-          right.totalSeconds - left.totalSeconds || left.project.localeCompare(right.project),
-      )
-    return {
-      date,
-      totalSeconds: projectList.reduce((sum, project) => sum + project.totalSeconds, 0),
-      projects: projectList,
-    }
-  })
+  const byDay = deriveByDay(allProjects, days.map(formatLocalDate))
+  const byProject = allProjects
+    .filter(
+      (project) =>
+        project.timedSeconds !== 0 || project.adjustedSeconds !== 0 || project.details.length > 0,
+    )
+    .sort(compareProjects)
 
   const first = days[0]
   const last = days.at(-1)
@@ -213,6 +174,48 @@ export function buildReport(
       weekStart,
     },
     byProject,
-    byDay: byDayList,
+    byDay,
   }
+}
+
+/** Largest Project first, ties by name. */
+export function compareProjects(
+  left: Pick<ReportProject, "project" | "totalSeconds">,
+  right: Pick<ReportProject, "project" | "totalSeconds">,
+): number {
+  return right.totalSeconds - left.totalSeconds || left.project.localeCompare(right.project)
+}
+
+/** Largest Description first, ties by text. */
+export function compareDetails(left: ReportDetail, right: ReportDetail): number {
+  return (
+    right.totalSeconds - left.totalSeconds || left.description.localeCompare(right.description)
+  )
+}
+
+/**
+ * The by-day view: each date's Total time per Project, summed from the
+ * Projects' Timed sub-rows and Adjustment days. Days with no time keep an
+ * empty row.
+ */
+export function deriveByDay(byProject: ReportProject[], dates: string[]): ReportDay[] {
+  return dates.map((date) => {
+    const projects = byProject
+      .map((project) => ({
+        project: project.project,
+        totalSeconds:
+          project.details.reduce(
+            (sum, detail) =>
+              sum + (detail.byDay.find((item) => item.date === date)?.timedSeconds ?? 0),
+            0,
+          ) + (project.adjustmentDays.find((item) => item.date === date)?.deltaSeconds ?? 0),
+      }))
+      .filter((project) => project.totalSeconds !== 0)
+      .sort(compareProjects)
+    return {
+      date,
+      totalSeconds: projects.reduce((sum, project) => sum + project.totalSeconds, 0),
+      projects,
+    }
+  })
 }

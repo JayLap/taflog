@@ -19,6 +19,18 @@ export const WEEKDAYS = [
 ] as const
 export type Weekday = (typeof WEEKDAYS)[number]
 
+export function isWeekday(name: string): name is Weekday {
+  return (WEEKDAYS as readonly string[]).includes(name)
+}
+
+/** A record with one value per weekday, computed by `valueOf`. */
+export function byWeekday<T>(valueOf: (weekday: Weekday) => T): Record<Weekday, T> {
+  return Object.fromEntries(WEEKDAYS.map((weekday) => [weekday, valueOf(weekday)])) as Record<
+    Weekday,
+    T
+  >
+}
+
 /** The weekday of a local calendar date. */
 export function weekdayOf(date: Date): Weekday {
   return WEEKDAYS[date.getDay()]!

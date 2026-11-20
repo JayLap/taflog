@@ -1,12 +1,11 @@
 import {
   CONFIG_KEYS,
   type ConfigKey,
+  displayConfigValue,
   resolvedFor,
-  weekdayOfKey,
   type Resolved,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
-import { formatDurationInput } from "../../../domain/duration.ts"
 import { createStyle, sanitizeForTerminal, type Style } from "./style.ts"
 
 export interface RenderConfigOptions {
@@ -43,12 +42,8 @@ export function renderConfig(view: ResolvedConfig, options: RenderConfigOptions 
   )
 }
 
-/** Text form of a value: durations as typed (`7h30m`), `off` for no target. */
 function displayValue(view: ResolvedConfig, key: ConfigKey): string {
-  const { value } = resolvedFor(view, key)
-  if (weekdayOfKey(key) !== null) return value === null ? "off" : formatDurationInput(value as number)
-  if (key === "reportStep") return formatDurationInput(value as number)
-  return String(value)
+  return String(displayConfigValue(key, resolvedFor(view, key).value as string | number | null))
 }
 
 export interface ConfigJsonOptions {

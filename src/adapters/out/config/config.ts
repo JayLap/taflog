@@ -3,20 +3,21 @@ import { dirname } from "node:path"
 import {
   CONFIG_KEYS,
   DEFAULT_DAY_TARGETS,
+  displayConfigValue,
   DEFAULT_REPORT_STEP,
   weekdayOfKey,
   type ColorPolicy,
   type Config,
   type ConfigKey,
   type ConfigSource,
+  type DayTargets,
   type IconsProfile,
   type PartialConfig,
   type Resolved,
   type ResolvedConfig,
 } from "../../../domain/config.ts"
-import { WEEKDAYS, type WeekStart, type Weekday } from "../../../domain/datetime.ts"
-import { formatDurationInput, parseDuration } from "../../../domain/duration.ts"
-import type { DayTargets } from "../../../domain/normalize.ts"
+import { byWeekday, isWeekday, type WeekStart, type Weekday } from "../../../domain/datetime.ts"
+import { parseDuration } from "../../../domain/duration.ts"
 import { DEFAULT_MAX_TIMER_HOURS } from "../../../domain/timer.ts"
 import { defaultDataDir } from "../store/paths.ts"
 import { ConfigError } from "./errors.ts"
@@ -159,17 +160,12 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedConfi
       defaults.icons,
     ),
     reportStep: first([[file.reportStep ?? null, "file"]], defaults.reportStep),
-    dayTargets: Object.fromEntries(
-      WEEKDAYS.map((weekday) => {
-        const fromFile = file.dayTargets?.[weekday]
-        return [
-          weekday,
-          fromFile === undefined
-            ? { value: defaults.dayTargets[weekday], source: "default" }
-            : { value: fromFile, source: "file" },
-        ]
-      }),
-    ) as ResolvedConfig["dayTargets"],
+    dayTargets: byWeekday((weekday): Resolved<number | null> => {
+      const fromFile = file.dayTargets?.[weekday]
+      return fromFile === undefined
+        ? { value: defaults.dayTargets[weekday], source: "default" }
+        : { value: fromFile, source: "file" }
+    }),
   }
 }
 
@@ -188,11 +184,11 @@ function mergeValue(file: PartialConfig, key: ConfigKey, value: string | number 
   return { ...file, [key]: value } as PartialConfig
 }
 
-/** What `set` echoes back: durations in the form a person types them. */
-function displayValue(key: ConfigKey, value: string | number | null): string | number {
-  if (weekdayOfKey(key) !== null) return value === null ? "off" : formatDurationInput(value as number)
-  if (key === "reportStep") return formatDurationInput(value as number)
-  return value as string | number
+/** The stored value for a key, looking inside `dayTargets` for weekday keys. */
+function storedValue(config: PartialConfig, key: ConfigKey): string | number | null | undefined {
+  const weekday = weekdayOfKey(key)
+  if (weekday !== null) return config.dayTargets?.[weekday]
+  return config[key as keyof Omit<PartialConfig, "dayTargets">]
 }
 
 /**
@@ -207,7 +203,7 @@ export async function setConfigValue(
   if (!isConfigKey(key)) throw new ConfigError(`unknown config key: ${key}`)
   const value = parseCliValue(key, raw)
   await store.write(mergeValue(await store.read(), key, value))
-  return { key, value: displayValue(key, value) }
+  return { key, value: displayConfigValue(key, value) }
 }
 
 /** Reads and writes the versioned JSON config file (ADR-0002, SPEC §7). */
@@ -245,22 +241,15 @@ export class JsonConfigStore {
   async write(config: PartialConfig): Promise<void> {
     await mkdir(dirname(this.file), { recursive: true })
     const ordered: Record<string, unknown> = {}
+    const targets: Record<string, unknown> = {}
     for (const key of CONFIG_KEYS) {
-      if (key === "reportStep") {
-        if (config.reportStep !== undefined) ordered[key] = formatDurationInput(config.reportStep)
-      } else if (weekdayOfKey(key) === null) {
-        const value = config[key as keyof PartialConfig]
-        if (value !== undefined) ordered[key] = value
-      }
+      const value = storedValue(config, key)
+      if (value === undefined) continue
+      const weekday = weekdayOfKey(key)
+      if (weekday === null) ordered[key] = displayConfigValue(key, value)
+      else targets[weekday] = displayConfigValue(key, value)
     }
-    if (config.dayTargets !== undefined) {
-      const targets: Record<string, string> = {}
-      for (const weekday of WEEKDAYS) {
-        const value = config.dayTargets[weekday]
-        if (value !== undefined) targets[weekday] = value === null ? "off" : formatDurationInput(value)
-      }
-      if (Object.keys(targets).length > 0) ordered.dayTargets = targets
-    }
+    if (Object.keys(targets).length > 0) ordered.dayTargets = targets
     await writeFile(this.file, `${JSON.stringify(ordered, null, 2)}\n`, { mode: 0o600 })
   }
 }
@@ -340,10 +329,10 @@ function parseDayTargets(value: unknown): Partial<DayTargets> {
   }
   const targets: Partial<Record<Weekday, number | null>> = {}
   for (const [name, raw] of Object.entries(value)) {
-    if (!(WEEKDAYS as readonly string[]).includes(name)) {
+    if (!isWeekday(name)) {
       throw new ConfigError(`unknown config key: dayTargets.${name}`)
     }
-    targets[name as Weekday] = parseDayTarget(raw, `dayTargets.${name}`)
+    targets[name] = parseDayTarget(raw, `dayTargets.${name}`)
   }
   return targets
 }

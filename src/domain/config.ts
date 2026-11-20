@@ -1,5 +1,5 @@
-import { WEEKDAYS, type WeekStart, type Weekday } from "./datetime.ts"
-import type { DayTargets } from "./normalize.ts"
+import { isWeekday, type WeekStart, type Weekday } from "./datetime.ts"
+import { formatDurationInput } from "./duration.ts"
 
 /**
  * The configuration schema (SPEC §7): value unions, the resolved wrapper, and
@@ -13,6 +13,9 @@ export type ColorPolicy = "auto" | "always" | "never"
 
 /** Glyph profile (SPEC §7, §9.4). */
 export type IconsProfile = "auto" | "nerd" | "ascii"
+
+/** Target seconds per weekday; `null` leaves that weekday unscaled (SPEC §7). */
+export type DayTargets = Record<Weekday, number | null>
 
 /** The fully-populated, validated configuration (SPEC §7). */
 export interface Config {
@@ -37,7 +40,7 @@ export type PartialConfig = Partial<Omit<Config, "dayTargets">> & {
 export type DayTargetKey = `dayTargets.${Weekday}`
 export type ConfigKey = Exclude<keyof Config, "dayTargets"> | DayTargetKey
 
-export const DAY_TARGET_PREFIX = "dayTargets."
+const DAY_TARGET_PREFIX = "dayTargets."
 
 /** The `dayTargets.<weekday>` key for a weekday. */
 export function dayTargetKey(weekday: Weekday): DayTargetKey {
@@ -48,7 +51,7 @@ export function dayTargetKey(weekday: Weekday): DayTargetKey {
 export function weekdayOfKey(key: string): Weekday | null {
   if (!key.startsWith(DAY_TARGET_PREFIX)) return null
   const name = key.slice(DAY_TARGET_PREFIX.length)
-  return (WEEKDAYS as readonly string[]).includes(name) ? (name as Weekday) : null
+  return isWeekday(name) ? name : null
 }
 
 /** Built-in targets: 7h30m Monday–Thursday, 5h30m Friday, off at the weekend. */
@@ -74,13 +77,9 @@ export const CONFIG_KEYS: readonly ConfigKey[] = [
   "color",
   "icons",
   "reportStep",
-  "dayTargets.monday",
-  "dayTargets.tuesday",
-  "dayTargets.wednesday",
-  "dayTargets.thursday",
-  "dayTargets.friday",
-  "dayTargets.saturday",
-  "dayTargets.sunday",
+  ...(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const).map(
+    dayTargetKey,
+  ),
 ]
 
 /** Where an effective value came from, highest precedence first (SPEC §7). */
@@ -108,4 +107,15 @@ export function resolvedFor(view: ResolvedConfig, key: ConfigKey): Resolved<unkn
   const weekday = weekdayOfKey(key)
   if (weekday !== null) return view.dayTargets[weekday]
   return view[key as Exclude<ConfigKey, DayTargetKey>]
+}
+
+/**
+ * A value in the text form a person types: durations as `7h30m`, `off` for no
+ * day target. Other values pass through. Shared by `config`, `set`, and the
+ * config file so the three agree.
+ */
+export function displayConfigValue(key: ConfigKey, value: string | number | null): string | number {
+  if (weekdayOfKey(key) !== null) return value === null ? "off" : formatDurationInput(value as number)
+  if (key === "reportStep") return formatDurationInput(value as number)
+  return value as string | number
 }
